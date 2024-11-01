@@ -5,6 +5,7 @@ export interface IUser extends Document {
     email: string;
     createdAt: Date;
     openAikey: string;
+    workspaces: mongoose.Types.ObjectId[];
 }
 
 const userSchema: Schema = new Schema({
@@ -12,6 +13,9 @@ const userSchema: Schema = new Schema({
     email: { type: String, required: true, unique: true },
     openAikey: { type: String, default: "" },
     createdAt: { type: Date, default: Date.now },
+    workspaces: [
+        { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: [] },
+    ],
 });
 
 const User = mongoose.model<IUser>("User", userSchema);
