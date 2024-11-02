@@ -1,5 +1,14 @@
 import { Router } from "express";
-import { createUser, getUser, saveOpenAikey, createNewWorkspace , getAllWorkspaces, getWorkspace} from "../controllers/userController";
+import {
+    createUser,
+    getUser,
+    saveOpenAikey,
+    createNewWorkspace,
+    getAllWorkspaces,
+    getWorkspace,
+    createNewNote,
+    getAllNotes,
+} from "../controllers/userController";
 
 const router = Router();
 
@@ -9,15 +18,21 @@ router.post("/signup", createUser);
 router.get("/:clerkId", getUser);
 
 // @ts-ignore
-router.post('/saveApiKey/:clerkId', saveOpenAikey)
+router.post("/saveApiKey/:clerkId", saveOpenAikey);
 
 // @ts-ignore
-router.post('/createNewWorkspace/:clerkId', createNewWorkspace);
+router.post("/createNewWorkspace/:clerkId", createNewWorkspace);
 
 // @ts-ignore
-router.get('/getAllWorkspaces/:clerkId', getAllWorkspaces);
+router.get("/getAllWorkspaces/:clerkId", getAllWorkspaces);
 
 // @ts-ignore
-router.get('/getWorkspace/:workspaceId', getWorkspace);
+router.get("/getWorkspace/:workspaceId", getWorkspace);
+
+// @ts-ignore
+router.post("/createNewNote/:workspaceId", createNewNote);
+
+// @ts-ignore
+router.get("/getAllNotes/:workspaceId", getAllNotes);
 
 export default router;
