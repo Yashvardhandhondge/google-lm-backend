@@ -1,7 +1,6 @@
 import express from "express";
 import connectDB from "./config/db";
 import userRoutes from "./routes/user";
-// import { clerkMiddleware } from "./middleware/clerkMiddleware";
 import { clerkMiddleware } from '@clerk/express'
 import dotenv from "dotenv";
 import cors from "cors";

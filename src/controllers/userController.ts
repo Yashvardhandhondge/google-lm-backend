@@ -4,8 +4,11 @@ import Workspace from "../models/Workspace";
 import Note from "../models/Note";
 import mongoose from "mongoose";
 import {
-    fetchAndSummarizeTextWithChatGPT,
+    getContentThroughUrl,
     summarizeContent,
+    getContentThroughFile,
+    uploadFiles,
+    extractTextFromFile,
 } from "../services/Source";
 import Source from "../models/Source";
 
@@ -164,28 +167,123 @@ export const getAllNotes = async (req: Request, res: Response) => {
 
 export const createSource = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
-    const { url } = req.body;
+    const { url, uploadType } = req.body;
+    const file = req.file as Express.Multer.File ?? null;
+
     try {
-        const workspace = await Workspace.findOne({
-            _id: workspaceId,
-        });
+        const workspace = await Workspace.findById(workspaceId);
         if (!workspace) {
             return res.status(404).json({ message: "Workspace not found" });
         }
-        const summary = await summarizeContent(url);
-        const newSource = new Source({
-            url,
-            summary,
-            name: "Testing",
-        });
-        await newSource.save();
 
-        workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+        if (uploadType === "file" && req.file) {
+            const fileUrl = await uploadFiles(file);
+            const content = await extractTextFromFile(fileUrl)
+            const summary = await summarizeContent(content)
 
-        await workspace.save();
-        return res.status(200).json(newSource);
+            const newSource = new Source({
+                url: fileUrl,
+                summary,
+                name: req.file.originalname,
+                uploadType,
+            });
+            await newSource.save();
+
+            workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+            await workspace.save();
+
+            return res.status(200).json(newSource);
+        } else if (uploadType === "url" && url) {
+            // If URL is provided, process it as usual
+            const content = await getContentThroughUrl(url);
+            const summary = await summarizeContent(content);
+            
+
+            const newSource = new Source({
+                url,
+                summary,
+                name: "URL Source",
+                uploadType,
+            });
+            await newSource.save();
+
+            workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+            await workspace.save();
+
+            return res.status(200).json(newSource);
+        } else {
+            return res.status(400).json({
+                message: "Invalid input. Either a file or URL is required.",
+            });
+        }
     } catch (error) {
-        console.error("Error fetching notes:", error);
+        console.error("Error creating source:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+export const test = async (req: Request, res: Response) => {
+    // const { workspaceId } = req.params;
+    // const { url, uploadType } = req.body;
+    const file = req.file as Express.Multer.File ?? null;
+
+    try {
+        // const workspace = await Workspace.findById(workspaceId);
+        // if (!workspace) {
+        //     return res.status(404).json({ message: "Workspace not found" });
+        // }
+
+        // if (file) {
+        //     const fileUrl = await uploadFiles(file);
+        //     res.status(200).json({
+        //         message: "File uploaded successfully!",
+        //         url: fileUrl,
+        //     });
+        const content = await extractTextFromFile('https://firebasestorage.googleapis.com/v0/b/image-storage-4449d.appspot.com/o/files%2F1cfd7236-b8b5-4e4d-b4a5-f61d29368c18?alt=media&token=cce2735f-af74-4435-89d7-1bf02eb34cea')
+        const result = await summarizeContent(content)
+        console.log(result);
+            // const content = await getContentThroughFile(fileUrl);
+            // console.log(content);
+            // const summary = await summarizeContent(content);
+
+            // const newSource = new Source({
+            //     url: fileUrl,
+            //     summary,
+            //     name: req.file.originalname,
+            //     uploadType,
+            // });
+            // await newSource.save();
+
+            // workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+            // await workspace.save();
+
+            // return res.status(200).json(newSource);
+            // } else if (uploadType === "url" && url) {
+            //     // If URL is provided, process it as usual
+            //     const content = await getContentThroughUrl(url);
+            //     const summary = await summarizeContent(content);
+
+            //     const newSource = new Source({
+            //         url,
+            //         summary,
+            //         name: "URL Source",
+            //         uploadType,
+            //     });
+            //     await newSource.save();
+
+            //     workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+            //     await workspace.save();
+
+            //     return res.status(200).json(newSource);
+            // } else {
+            //     return res
+            //         .status(400)
+            //         .json({
+            //             message: "Invalid input. Either a file or URL is required.",
+            //         });
+        }
+     catch (error) {
+        console.error("Error creating source:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };

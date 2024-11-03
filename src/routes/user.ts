@@ -10,9 +10,15 @@ import {
     getAllNotes,
     createSource,
     getAllSources,
+    test
 } from "../controllers/userController";
+import multer from "multer";
+
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 const router = Router();
+
 
 router.post("/signup", createUser);
 
@@ -38,7 +44,10 @@ router.post("/createNewNote/:workspaceId", createNewNote);
 router.get("/getAllNotes/:workspaceId", getAllNotes);
 
 // @ts-ignore
-router.post("/createSource/:workspaceId", createSource);
+router.post("/createSource/:workspaceId", upload.single("file"), createSource);
+
+// @ts-ignore
+router.post("/test", upload.single("file"), test);
 
 // @ts-ignore
 router.get("/getAllSources/:workspaceId", getAllSources);

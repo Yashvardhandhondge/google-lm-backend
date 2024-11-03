@@ -17,6 +17,9 @@ const sourceSchema: Schema = new Schema({
     },
     name: {
         type: String,
+    },
+    uploadType: {
+        type: String
     }
 });
 
