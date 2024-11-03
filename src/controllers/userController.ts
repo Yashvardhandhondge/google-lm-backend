@@ -3,6 +3,11 @@ import User from "../models/User";
 import Workspace from "../models/Workspace";
 import Note from "../models/Note";
 import mongoose from "mongoose";
+import {
+    fetchAndSummarizeTextWithChatGPT,
+    summarizeContent,
+} from "../services/Source";
+import Source from "../models/Source";
 
 export const createUser = async (req: Request, res: Response) => {
     const { email, clerkId } = req.body;
@@ -82,10 +87,12 @@ export const createNewWorkspace = async (req: Request, res: Response) => {
 export const getAllWorkspaces = async (req: Request, res: Response) => {
     const { clerkId } = req.params;
     try {
-        const user = await User.findOne({ clerkId }).populate({
-            path: "workspaces",
-            select: "-notes", 
-        });
+        const user = await User.findOne({ clerkId })
+            .populate({
+                path: "workspaces",
+                select: "-notes, -source",
+            })
+            .lean();
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
@@ -141,14 +148,60 @@ export const getAllNotes = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
 
     try {
-        const workspace = await Workspace.findOne({_id: workspaceId}).populate(
-            "notes"
-        );
+        const workspace = await Workspace.findOne({
+            _id: workspaceId,
+        }).populate("notes");
         if (!workspace) {
             return res.status(404).json({ message: "Workspace not found" });
         }
 
         res.status(200).json(workspace.notes);
+    } catch (error) {
+        console.error("Error fetching notes:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+export const createSource = async (req: Request, res: Response) => {
+    const { workspaceId } = req.params;
+    const { url } = req.body;
+    try {
+        const workspace = await Workspace.findOne({
+            _id: workspaceId,
+        });
+        if (!workspace) {
+            return res.status(404).json({ message: "Workspace not found" });
+        }
+        const summary = await summarizeContent(url);
+        const newSource = new Source({
+            url,
+            summary,
+            name: "Testing",
+        });
+        await newSource.save();
+
+        workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
+
+        await workspace.save();
+        return res.status(200).json(newSource);
+    } catch (error) {
+        console.error("Error fetching notes:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+export const getAllSources = async (req: Request, res: Response) => {
+    const { workspaceId } = req.params;
+
+    try {
+        const workspace = await Workspace.findOne({
+            _id: workspaceId,
+        }).populate("sources");
+
+        if (!workspace) {
+            return res.status(404).json({ message: "Workspace not found" });
+        }
+        res.status(200).json(workspace.sources);
     } catch (error) {
         console.error("Error fetching notes:", error);
         res.status(500).json({ message: "Internal Server Error" });

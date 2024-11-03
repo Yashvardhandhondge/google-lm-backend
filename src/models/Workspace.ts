@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IWorkspace extends Document {
     name: string;
     notes: mongoose.Types.ObjectId[];
+    sources: mongoose.Types.ObjectId[];
 }
 
 const workspaceSchema: Schema = new Schema({
@@ -11,7 +12,18 @@ const workspaceSchema: Schema = new Schema({
         required: true,
     },
     notes: [
-        { type: mongoose.Schema.Types.ObjectId, ref: "Note", default: [] },
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Note",
+            default: [],
+        },
+    ],
+    sources: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Source",
+            default: [],
+        },
     ],
 });
 

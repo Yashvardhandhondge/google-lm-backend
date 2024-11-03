@@ -8,6 +8,8 @@ import {
     getWorkspace,
     createNewNote,
     getAllNotes,
+    createSource,
+    getAllSources,
 } from "../controllers/userController";
 
 const router = Router();
@@ -34,5 +36,11 @@ router.post("/createNewNote/:workspaceId", createNewNote);
 
 // @ts-ignore
 router.get("/getAllNotes/:workspaceId", getAllNotes);
+
+// @ts-ignore
+router.post("/createSource/:workspaceId", createSource);
+
+// @ts-ignore
+router.get("/getAllSources/:workspaceId", getAllSources);
 
 export default router;
