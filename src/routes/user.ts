@@ -10,7 +10,8 @@ import {
     getAllNotes,
     createSource,
     getAllSources,
-    test
+    test,
+    createConversation
 } from "../controllers/userController";
 import multer from "multer";
 
@@ -51,5 +52,8 @@ router.post("/test", upload.single("file"), test);
 
 // @ts-ignore
 router.get("/getAllSources/:workspaceId", getAllSources);
+
+// @ts-ignore
+router.post('/createConversation', createConversation);
 
 export default router;

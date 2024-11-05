@@ -4,11 +4,16 @@ import dotenv from "dotenv";
 import { Groq } from "groq-sdk";
 import OpenAI from "openai";
 import pdfParse from "pdf-parse";
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from '../config/firebase';
-import Tesseract from 'tesseract.js';
+import { storage } from "../config/firebase";
+import Tesseract from "tesseract.js";
+
+interface ConversationParams {
+    context: string;
+    question: string;
+}
 
 dotenv.config();
 
@@ -22,14 +27,14 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
 });
 
-const MAX_TOKENS = 300; 
+const MAX_TOKENS = 300;
 
 function truncateText(text: string): string {
     const words = text.split(" ");
-    return words.slice(0, MAX_TOKENS).join(" "); 
+    return words.slice(0, MAX_TOKENS).join(" ");
 }
 
-export async function getContentThroughUrl(url: string): Promise<string>  {
+export async function getContentThroughUrl(url: string): Promise<string> {
     const { data: html } = await axios.get(url);
     const $ = cheerio.load(html);
     const content = truncateText($("body").text());
@@ -56,7 +61,9 @@ export async function summarizeContent(content: string): Promise<string> {
     );
 }
 
-export const getContentThroughFile = async (fileUrl: string): Promise<string> => {
+export const getContentThroughFile = async (
+    fileUrl: string
+): Promise<string> => {
     try {
         // Read the PDF file into a buffer
         const dataBuffer = fs.readFileSync(fileUrl);
@@ -67,83 +74,61 @@ export const getContentThroughFile = async (fileUrl: string): Promise<string> =>
         // Return the extracted text
         return truncateText(pdfData.text);
     } catch (error) {
-        console.error('Error extracting text from PDF:', error);
+        console.error("Error extracting text from PDF:", error);
         throw error; // Rethrow the error for handling by the caller
     }
 };
 
-export const uploadFiles = async(file: Express.Multer.File) => {
+export const uploadFiles = async (file: Express.Multer.File) => {
     const metadata = {
         contentType: file.mimetype,
     };
     const userId = uuidv4();
     const storageRef = ref(storage, `files/${userId}`);
-    const uploadResult = await uploadBytes(
-        storageRef,
-        file.buffer,
-        metadata
-    );
+    const uploadResult = await uploadBytes(storageRef, file.buffer, metadata);
     const fileUrl = await getDownloadURL(uploadResult.ref);
     return fileUrl;
-}
-
+};
 
 export async function extractTextFromFile(url: string): Promise<string> {
     try {
         // Step 1: Download the file
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const response = await axios.get(url, { responseType: "arraybuffer" });
         const buffer = Buffer.from(response.data);
 
         // Step 2: Determine the file type based on the URL or content
-        const contentType = response.headers['content-type'];
+        const contentType = response.headers["content-type"];
 
-        let extractedText = '';
+        let extractedText = "";
 
-        if (contentType === 'application/pdf') {
+        if (contentType === "application/pdf") {
             // If it's a PDF, use pdf-parse
-            extractedText = await pdfParse(buffer).then(data => data.text);
-        } else if (contentType.startsWith('image/')) {
+            extractedText = await pdfParse(buffer).then((data) => data.text);
+        } else if (contentType.startsWith("image/")) {
             // If it's an image, use Tesseract.js for OCR
-            const imagePath = './temp_image.png'; // Temporary image path
+            const imagePath = "./temp_image.png"; // Temporary image path
             fs.writeFileSync(imagePath, buffer); // Save the image temporarily
 
-            const { data: { text } } = await Tesseract.recognize(
-                imagePath,
-                'eng',
-                {
-                    logger: info => console.log(info) // Optional logger
-                }
-            );
+            const {
+                data: { text },
+            } = await Tesseract.recognize(imagePath, "eng", {
+                logger: (info) => console.log(info), // Optional logger
+            });
 
             extractedText = text;
 
             // Clean up temporary image file
             fs.unlinkSync(imagePath);
         } else {
-            throw new Error('Unsupported file type');
+            throw new Error("Unsupported file type");
         }
 
         return truncateText(extractedText);
     } catch (error) {
-        console.error('Error extracting text:', error);
+        console.error("Error extracting text:", error);
         throw error; // Rethrow error for handling by caller
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // export const fetchAndSummarizeTextWithChatGPT = async (url: string) => {
 //     try {
@@ -191,45 +176,43 @@ export async function extractTextFromFile(url: string): Promise<string> {
 //     }
 // };
 
-// export const fetchAndSummarizeTextWithChatGPT = async (
-//     url: string
-// ): Promise<string> => {
-//     try {
-//         const { data: html } = await axios.get(url);
-//         const $ = cheerio.load(html);
-//         const content = $("body").text().trim();
-//         if (!content) {
-//             throw new Error("No content found to summarize.");
-//         }
+export const respondToConversation = async ({
+    context,
+    question,
+}: ConversationParams): Promise<string> => {
+    try {
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-3.5-turbo",
+                messages: [
+                    {
+                        role: "system",
+                        content: context,
+                    },
+                    {
+                        role: "user",
+                        content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side`,
+                    },
+                ],
+                max_tokens: 100,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${openAIApiKey}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
 
-//         const response = await axios.post(
-//             "https://api.openai.com/v1/chat/completions",
-//             {
-//                 model: "gpt-4o-mini",
-//                 messages: [
-//                     {
-//                         role: "system",
-//                         content:
-//                             "You are a helpful assistant that summarizes website content.",
-//                     },
-//                     {
-//                         role: "user",
-//                         content: `Please summarize the following content in plain text in 50 words:\n\n${content}`,
-//                     },
-//                 ],
-//                 max_tokens: 10,
-//             },
-//             {
-//                 headers: {
-//                     Authorization: `Bearer ${openAIApiKey}`,
-//                     "Content-Type": "application/json",
-//                 },
-//             }
-//         );
+        const messageContent = response.data.choices?.[0]?.message?.content;
+        if (!messageContent) {
+            throw new Error("No content received in the response");
+        }
 
-//         return response.data.choices[0].message.content;
-//     } catch (error: any) {
-//         console.error(error.response?.data || error.message);
-//         throw new Error("Failed to summarize the content with ChatGPT");
-//     }
-// };
+        return messageContent;
+    } catch (error: any) {
+        console.error(error.response?.data || error.message);
+        throw new Error("Failed to retrieve the response from ChatGPT");
+    }
+};

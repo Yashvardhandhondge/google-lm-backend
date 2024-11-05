@@ -9,6 +9,7 @@ import {
     getContentThroughFile,
     uploadFiles,
     extractTextFromFile,
+    respondToConversation,
 } from "../services/Source";
 import Source from "../models/Source";
 
@@ -305,3 +306,14 @@ export const getAllSources = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+export const createConversation = async(req: Request, res: Response) => {
+    const {context, question} = req.body;
+    try {
+        const resp = await respondToConversation({context, question});
+        res.status(200).json({message: resp});
+    } catch(error) {
+        console.error("Error fetching notes:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
