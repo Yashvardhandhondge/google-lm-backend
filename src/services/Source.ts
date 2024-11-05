@@ -90,45 +90,58 @@ export const uploadFiles = async (file: Express.Multer.File) => {
     return fileUrl;
 };
 
-export async function extractTextFromFile(url: string): Promise<string> {
+export async function extractTextFromFile(
+    file: Express.Multer.File
+): Promise<string> {
     try {
-        // Step 1: Download the file
-        const response = await axios.get(url, { responseType: "arraybuffer" });
-        const buffer = Buffer.from(response.data);
-
-        // Step 2: Determine the file type based on the URL or content
-        const contentType = response.headers["content-type"];
-
-        let extractedText = "";
-
-        if (contentType === "application/pdf") {
-            // If it's a PDF, use pdf-parse
-            extractedText = await pdfParse(buffer).then((data) => data.text);
-        } else if (contentType.startsWith("image/")) {
-            // If it's an image, use Tesseract.js for OCR
-            const imagePath = "./temp_image.png"; // Temporary image path
-            fs.writeFileSync(imagePath, buffer); // Save the image temporarily
-
-            const {
-                data: { text },
-            } = await Tesseract.recognize(imagePath, "eng", {
-                logger: (info) => console.log(info), // Optional logger
-            });
-
-            extractedText = text;
-
-            // Clean up temporary image file
-            fs.unlinkSync(imagePath);
-        } else {
-            throw new Error("Unsupported file type");
-        }
-
-        return truncateText(extractedText);
+        // Step 1: Convert File to ArrayBuffer, then to Buffer
+        const data = await pdfParse(file.buffer);
+        return data.text;
     } catch (error) {
-        console.error("Error extracting text:", error);
+        console.error("Error extracting text from PDF:", error);
         throw error; // Rethrow error for handling by caller
     }
 }
+
+// export async function extractTextFromFile(url: string): Promise<string> {
+//     try {
+//         // Step 1: Download the file
+//         const response = await axios.get(url, { responseType: "arraybuffer" });
+//         const buffer = Buffer.from(response.data);
+
+//         // Step 2: Determine the file type based on the URL or content
+//         const contentType = response.headers["content-type"];
+
+//         let extractedText = "";
+
+//         if (contentType === "application/pdf") {
+//             // If it's a PDF, use pdf-parse
+//             extractedText = await pdfParse(buffer).then((data) => data.text);
+//         } else if (contentType.startsWith("image/")) {
+//             // If it's an image, use Tesseract.js for OCR
+//             const imagePath = "./temp_image.png"; // Temporary image path
+//             fs.writeFileSync(imagePath, buffer); // Save the image temporarily
+
+//             const {
+//                 data: { text },
+//             } = await Tesseract.recognize(imagePath, "eng", {
+//                 logger: (info) => console.log(info), // Optional logger
+//             });
+
+//             extractedText = text;
+
+//             // Clean up temporary image file
+//             fs.unlinkSync(imagePath);
+//         } else {
+//             throw new Error("Unsupported file type");
+//         }
+
+//         return truncateText(extractedText);
+//     } catch (error) {
+//         console.error("Error extracting text:", error);
+//         throw error; // Rethrow error for handling by caller
+//     }
+// }
 
 // export const fetchAndSummarizeTextWithChatGPT = async (url: string) => {
 //     try {
