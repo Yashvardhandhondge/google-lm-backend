@@ -1,10 +1,9 @@
 import express from "express";
 import connectDB from "./config/db";
 import userRoutes from "./routes/user";
-import { clerkMiddleware } from '@clerk/express'
+import { clerkMiddleware } from "@clerk/express";
 import dotenv from "dotenv";
 import cors from "cors";
-
 
 dotenv.config();
 
@@ -28,6 +27,9 @@ connectDB();
 
 // Routes
 app.use("/api/users", userRoutes);
+app.get("/", (req, res) => {
+    res.send("Hello, World!");
+});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

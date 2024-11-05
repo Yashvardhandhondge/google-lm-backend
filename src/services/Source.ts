@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import { Groq } from "groq-sdk";
 import OpenAI from "openai";
 import pdfParse from "pdf-parse";
-import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../config/firebase";
@@ -74,12 +73,11 @@ export async function extractTextFromFile(
     file: Express.Multer.File
 ): Promise<string> {
     try {
-        // Step 1: Convert File to ArrayBuffer, then to Buffer
         const data = await pdfParse(file.buffer);
         return data.text;
     } catch (error) {
         console.error("Error extracting text from PDF:", error);
-        throw error; // Rethrow error for handling by caller
+        throw error;
     }
 }
 
