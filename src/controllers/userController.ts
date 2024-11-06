@@ -61,6 +61,23 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
     }
 };
 
+export const getOpenAikey = async (req: Request, res: Response) => {
+    const { clerkId } = req.params;
+
+    try {
+        const user = await User.findOne({ clerkId });
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        res.status(200).json({
+            message: "API saved successfully",
+            api: user.openAikey,
+        });
+    } catch (error) {
+        res.status(500).json({ error: "Error fetching user data" });
+    }
+};
+
 export const createNewWorkspace = async (req: Request, res: Response) => {
     const { workspaceName } = req.body;
     const { clerkId } = req.params;
@@ -168,7 +185,7 @@ export const getAllNotes = async (req: Request, res: Response) => {
 export const createSource = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
     const { url, uploadType } = req.body;
-    const file = req.file as Express.Multer.File ?? null;
+    const file = (req.file as Express.Multer.File) ?? null;
 
     try {
         const workspace = await Workspace.findById(workspaceId);
@@ -178,8 +195,8 @@ export const createSource = async (req: Request, res: Response) => {
 
         if (uploadType === "file" && req.file) {
             const fileUrl = await uploadFiles(file);
-            const content = await extractTextFromFile(file)
-            const summary = await summarizeContent(content)
+            const content = await extractTextFromFile(file);
+            const summary = await summarizeContent(content);
 
             const newSource = new Source({
                 url: fileUrl,
@@ -197,7 +214,6 @@ export const createSource = async (req: Request, res: Response) => {
             // If URL is provided, process it as usual
             const content = await getContentThroughUrl(url);
             const summary = await summarizeContent(content);
-            
 
             const newSource = new Source({
                 url,
@@ -240,13 +256,36 @@ export const getAllSources = async (req: Request, res: Response) => {
     }
 };
 
-export const createConversation = async(req: Request, res: Response) => {
-    const {context, question} = req.body;
+export const createConversation = async (req: Request, res: Response) => {
+    const { context, question } = req.body;
     try {
-        const resp = await respondToConversation({context, question});
-        res.status(200).json({message: resp});
-    } catch(error) {
+        const resp = await respondToConversation({ context, question });
+        res.status(200).json({ message: resp });
+    } catch (error) {
         console.error("Error fetching notes:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
-}
+};
+
+export const updateNote = async (req: Request, res: Response) => {
+    const { noteId } = req.params;
+    const { heading, content } = req.body;
+    try {
+        const foundNote = await Note.findOne({ _id: noteId });
+
+        if (!foundNote) {
+            return res.status(404).json({ message: "Note not found" });
+        }
+
+        foundNote.heading = heading;
+        foundNote.content = content;
+        await foundNote.save();
+
+        res.status(200).json({
+            message: "Note updated successfully",
+            note: foundNote,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update note", error });
+    }
+};

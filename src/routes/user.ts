@@ -10,7 +10,9 @@ import {
     getAllNotes,
     createSource,
     getAllSources,
-    createConversation
+    createConversation,
+    updateNote,
+    getOpenAikey
 } from "../controllers/userController";
 import multer from "multer";
 
@@ -24,6 +26,9 @@ router.post("/signup", createUser);
 
 // @ts-ignore
 router.get("/:clerkId", getUser);
+
+// @ts-ignore
+router.get("/getAiKey/:clerkId", getOpenAikey);
 
 // @ts-ignore
 router.post("/saveApiKey/:clerkId", saveOpenAikey);
@@ -42,6 +47,9 @@ router.post("/createNewNote/:workspaceId", createNewNote);
 
 // @ts-ignore
 router.get("/getAllNotes/:workspaceId", getAllNotes);
+
+// @ts-ignore
+router.put("/updateNote/:noteId", updateNote);
 
 // @ts-ignore
 router.post("/createSource/:workspaceId", upload.single("file"), createSource);
