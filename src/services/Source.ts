@@ -1,8 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import dotenv from "dotenv";
-import { Groq } from "groq-sdk";
-import OpenAI from "openai";
 import pdfParse from "pdf-parse";
 import { v4 as uuidv4 } from "uuid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -15,14 +13,6 @@ interface ConversationParams {
 dotenv.config();
 
 const openAIApiKey = process.env.OPENAI_API_KEY;
-
-const openai = new OpenAI({
-    apiKey: openAIApiKey,
-});
-
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
 
 const MAX_TOKENS = 300;
 
@@ -42,21 +32,38 @@ export async function getContentThroughUrl(url: string): Promise<string> {
 }
 
 export async function summarizeContent(content: string): Promise<string> {
-    const summaryRequest = await groq.chat.completions.create({
-        messages: [
-            {
-                role: "user",
-                content: `Please summarize the following text:\n\n${content}`,
+    const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                },
+                {
+                    role: "user",
+                    content: `Please summarize the following content in 500 words:\n\n${content}`,
+                },
+            ],
+            max_tokens: 600, 
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${openAIApiKey}`,
+                "Content-Type": "application/json",
             },
-        ],
-        model: "llama3-8b-8192",
-    });
-
-    return (
-        summaryRequest.choices?.[0]?.message?.content ||
-        "Summary could not be generated."
+        }
     );
+
+    const messageContent = response.data.choices?.[0]?.message?.content;
+    if (!messageContent) {
+        throw new Error("No content received in the response");
+    }
+
+    return messageContent;
 }
+
 
 export const uploadFiles = async (file: Express.Multer.File) => {
     const metadata = {
