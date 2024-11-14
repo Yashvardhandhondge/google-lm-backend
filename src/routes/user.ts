@@ -25,7 +25,7 @@ const router = Router();
 router.post("/signup", createUser);
 
 // @ts-ignore
-router.get("/:clerkId", getUser);
+router.get("getUser/:clerkId", getUser);
 
 // @ts-ignore
 router.get("/getAiKey/:clerkId", getOpenAikey);

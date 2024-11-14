@@ -13,7 +13,7 @@ const API_URL = process.env.API_URL;
 
 // Middleware
 app.use(express.json());
-app.use(clerkMiddleware()); // Apply Clerk middleware
+app.use(clerkMiddleware({debug: true})); // Apply Clerk middleware
 
 app.use(
     cors({
