@@ -1,7 +1,6 @@
 import express from "express";
 import connectDB from "./config/db";
 import userRoutes from "./routes/user";
-import { clerkMiddleware } from "@clerk/express";
 import dotenv from "dotenv";
 import cors from "cors";
 
@@ -13,7 +12,6 @@ const API_URL = process.env.API_URL;
 
 // Middleware
 app.use(express.json());
-app.use(clerkMiddleware({debug: true})); // Apply Clerk middleware
 
 app.use(
     cors({
