@@ -46,7 +46,7 @@ export async function summarizeContent(content: string): Promise<string> {
                     content: `Please summarize the following content in 500 words:\n\n${content}`,
                 },
             ],
-            max_tokens: 600, 
+            max_tokens: 3000, 
         },
         {
             headers: {
@@ -107,7 +107,7 @@ export const respondToConversation = async ({
                         content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side`,
                     },
                 ],
-                max_tokens: 100,
+                max_tokens: 3000,
             },
             {
                 headers: {

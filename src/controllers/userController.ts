@@ -11,6 +11,10 @@ import {
     respondToConversation,
 } from "../services/Source";
 import Source from "../models/Source";
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export const createUser = async (req: Request, res: Response) => {
     const { email, clerkId } = req.body;
@@ -71,7 +75,8 @@ export const getOpenAikey = async (req: Request, res: Response) => {
         }
         res.status(200).json({
             message: "API saved successfully",
-            api: user.openAikey,
+            api: user.openAikey === ''? false: true,
+            googleAnalytics: user.googleAnalytics === ''? false: true 
         });
     } catch (error) {
         res.status(500).json({ error: "Error fetching user data" });
@@ -139,7 +144,7 @@ export const getWorkspace = async (req: Request, res: Response) => {
 
 export const createNewNote = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
-    const { heading, content } = req.body;
+    const { heading, content, type } = req.body;
 
     try {
         const workspace = await Workspace.findById(workspaceId);
@@ -150,6 +155,7 @@ export const createNewNote = async (req: Request, res: Response) => {
         const newNote = new Note({
             heading,
             content,
+            type
         });
 
         const savedNote = await newNote.save();
@@ -287,5 +293,47 @@ export const updateNote = async (req: Request, res: Response) => {
         });
     } catch (error) {
         res.status(500).json({ message: "Failed to update note", error });
+    }
+};
+
+export const googleAnalytics = async (req: Request, res: Response) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+    const parsedState = state ? JSON.parse(decodeURIComponent(state)) : null;
+    const clerkId = parsedState?.clerkId;
+
+    if (!code || !clerkId) {
+        return res.status(400).send("Missing authorization code or Clerk ID.");
+    }
+
+    try {
+        const tokenResponse = await axios.post(
+            "https://oauth2.googleapis.com/token",
+            {
+                code,
+                client_id: process.env.CLIENT_ID,
+                client_secret: process.env.CLIENT_SECRET,
+                redirect_uri: `${process.env.BACKEND_URL}/api/users/oauth/google-analytics/callback`,
+                grant_type: "authorization_code",
+            }
+        );
+
+        const { access_token, refresh_token } = tokenResponse.data;
+
+        const user = await User.findOne({clerkId});
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        user.googleAnalytics = access_token;
+        user.googleRefreshToken = refresh_token;
+
+        await user.save();
+
+        res.send("Google Analytics connected successfully!");
+    } catch (error) {
+        console.error("OAuth Error:", error);
+        res.status(500).send("OAuth process failed.");
     }
 };

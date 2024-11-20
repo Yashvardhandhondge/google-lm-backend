@@ -15,6 +15,10 @@ const noteSchema: Schema = new Schema(
             type: String,
             required: true,
         },
+        type: {
+            type: String,
+            default: 'Saved'
+        }
     },
     { timestamps: true }
 );
