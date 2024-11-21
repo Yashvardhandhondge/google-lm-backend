@@ -13,7 +13,11 @@ import {
     createConversation,
     updateNote,
     getOpenAikey,
-    googleAnalytics
+    googleAnalytics,
+    deleteNote,
+    renameSource,
+    removeSource,
+    renameWorkspace,
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
@@ -54,6 +58,9 @@ router.get("/getAllNotes/:workspaceId", ClerkExpressRequireAuth(), getAllNotes);
 router.put("/updateNote/:noteId", ClerkExpressRequireAuth(), updateNote);
 
 // @ts-ignore
+router.delete("/deleteNote", ClerkExpressRequireAuth(), deleteNote);
+
+// @ts-ignore
 router.post("/createSource/:workspaceId", ClerkExpressRequireAuth(), upload.single("file"), createSource);
 
 // @ts-ignore
@@ -61,6 +68,15 @@ router.get("/getAllSources/:workspaceId", ClerkExpressRequireAuth(), getAllSourc
 
 // @ts-ignore
 router.post('/createConversation', ClerkExpressRequireAuth(), createConversation);
+
+// @ts-ignore
+router.put("/rename-source", renameSource);
+
+// @ts-ignore
+router.delete("/remove-source", removeSource);
+
+// @ts-ignore
+router.put("/rename-workspace", renameWorkspace);
 
 // @ts-ignore
 router.get('/oauth/google-analytics/callback', googleAnalytics);

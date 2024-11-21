@@ -75,8 +75,8 @@ export const getOpenAikey = async (req: Request, res: Response) => {
         }
         res.status(200).json({
             message: "API saved successfully",
-            api: user.openAikey === ''? false: true,
-            googleAnalytics: user.googleAnalytics === ''? false: true 
+            api: user.openAikey === "" ? false : true,
+            googleAnalytics: user.googleAnalytics === "" ? false : true,
         });
     } catch (error) {
         res.status(500).json({ error: "Error fetching user data" });
@@ -155,7 +155,7 @@ export const createNewNote = async (req: Request, res: Response) => {
         const newNote = new Note({
             heading,
             content,
-            type
+            type,
         });
 
         const savedNote = await newNote.save();
@@ -320,7 +320,7 @@ export const googleAnalytics = async (req: Request, res: Response) => {
 
         const { access_token, refresh_token } = tokenResponse.data;
 
-        const user = await User.findOne({clerkId});
+        const user = await User.findOne({ clerkId });
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
@@ -335,5 +335,172 @@ export const googleAnalytics = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("OAuth Error:", error);
         res.status(500).send("OAuth process failed.");
+    }
+};
+
+export const deleteNote = async (req: Request, res: Response) => {
+    const { noteIds, workspaceId } = req.body;
+
+    if (!noteIds || !Array.isArray(noteIds)) {
+        return res
+            .status(400)
+            .json({
+                message: "Invalid payload. Expected an array of note IDs.",
+            });
+    }
+
+    try {
+
+        const result = await Note.deleteMany({ _id: { $in: noteIds } });
+
+        if (result.deletedCount === 0) {
+            return res
+                .status(404)
+                .json({ message: "No notes found to delete." });
+        }
+
+        if (workspaceId) {
+            const workspaceUpdate = await Workspace.findByIdAndUpdate(
+                workspaceId,
+                { $pull: { notes: { $in: noteIds } } }, 
+                { new: true } 
+            );
+
+            if (!workspaceUpdate) {
+                return res
+                    .status(404)
+                    .json({ message: "Workspace not found." });
+            }
+        }
+
+        res.status(200).json({
+            message: "Notes deleted successfully and removed from workspace.",
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal server error." });
+    }
+};
+
+export const renameSource = async (req: Request, res: Response) => {
+    const { _id, name } = req.body;
+
+    // Validate input
+    if (!_id || !name) {
+        return res.status(400).json({
+            message: "Invalid request. '_id' and 'name' are required.",
+        });
+    }
+
+    try {
+        // Find the source by _id and update its name
+        const updatedSource = await Source.findByIdAndUpdate(
+            _id,
+            { name },
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedSource) {
+            return res.status(404).json({
+                message: "Source not found.",
+            });
+        }
+
+        res.status(200).json({
+            message: "Source renamed successfully.",
+            source: updatedSource,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "Internal server error.",
+        });
+    }
+};
+
+export const removeSource = async (req: Request, res: Response) => {
+    const { _id, workspaceId } = req.body;
+
+    // Validate input
+    if (!_id) {
+        return res.status(400).json({
+            message: "Invalid request. '_id' is required.",
+        });
+    }
+
+    try {
+        // Delete the source from the Source collection
+        const deletedSource = await Source.findByIdAndDelete(_id);
+
+        if (!deletedSource) {
+            return res.status(404).json({
+                message: "Source not found.",
+            });
+        }
+
+        // If workspaceId is provided, remove the source reference from the workspace
+        if (workspaceId) {
+            const updatedWorkspace = await Workspace.findByIdAndUpdate(
+                workspaceId,
+                { $pull: { sources: _id } }, // Remove the source reference
+                { new: true } // Return the updated document
+            );
+
+            if (!updatedWorkspace) {
+                return res.status(404).json({
+                    message: "Workspace not found.",
+                });
+            }
+        } else {
+            // If no specific workspaceId is provided, remove the source reference from all workspaces
+            await Workspace.updateMany(
+                { sources: _id },
+                { $pull: { sources: _id } } // Remove the source reference
+            );
+        }
+
+        res.status(200).json({
+            message: "Source removed successfully.",
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "Internal server error.",
+        });
+    }
+};
+
+export const renameWorkspace = async (req: Request, res: Response) => {
+    const { _id, name } = req.body;
+
+    // Validate input
+    if (!_id || !name) {
+        return res.status(400).json({
+            message: "Invalid request. '_id' and 'name' are required.",
+        });
+    }
+
+    try {
+        const updatedWorkspace = await Workspace.findByIdAndUpdate(
+            _id,
+            { name },
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedWorkspace) {
+            return res.status(404).json({
+                message: "Workspace not found.",
+            });
+        }
+
+        res.status(200).json({
+            message: "Workspace renamed successfully.",
+            workspace: updatedWorkspace,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "Internal server error.",
+        });
     }
 };
