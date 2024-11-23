@@ -18,6 +18,10 @@ const noteSchema: Schema = new Schema(
         type: {
             type: String,
             default: 'Saved'
+        },
+        jsonDate: {
+            type: String,
+            default: ''
         }
     },
     { timestamps: true }

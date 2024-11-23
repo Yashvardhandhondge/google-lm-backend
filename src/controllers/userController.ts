@@ -13,6 +13,7 @@ import {
 import Source from "../models/Source";
 import axios from "axios";
 import dotenv from "dotenv";
+import { google } from "googleapis";
 
 dotenv.config();
 
@@ -297,60 +298,177 @@ export const updateNote = async (req: Request, res: Response) => {
 };
 
 export const googleAnalytics = async (req: Request, res: Response) => {
-    const code = req.query.code as string;
-    const state = req.query.state as string;
-    const parsedState = state ? JSON.parse(decodeURIComponent(state)) : null;
+    const state = req.query.state;
+
+    if (Array.isArray(state)) {
+        return res.status(400).send("Invalid state parameter: expected a single value, but got an array.");
+    }
+
+    if (typeof state !== 'string') {
+        return res.status(400).send("Invalid state parameter: expected a string.");
+    }
+
+    const parsedState = JSON.parse(decodeURIComponent(state));
     const clerkId = parsedState?.clerkId;
 
-    if (!code || !clerkId) {
-        return res.status(400).send("Missing authorization code or Clerk ID.");
+    if (!clerkId) {
+        return res.status(400).send("Missing Clerk ID.");
     }
 
     try {
-        const tokenResponse = await axios.post(
-            "https://oauth2.googleapis.com/token",
-            {
-                code,
-                client_id: process.env.CLIENT_ID,
-                client_secret: process.env.CLIENT_SECRET,
-                redirect_uri: `${process.env.BACKEND_URL}/api/users/oauth/google-analytics/callback`,
-                grant_type: "authorization_code",
-            }
-        );
+        // Exchange authorization code for access token
+        const tokenResponse = await axios.post("https://oauth2.googleapis.com/token", {
+            code: req.query.code,
+            client_id: process.env.CLIENT_ID,
+            client_secret: process.env.CLIENT_SECRET,
+            redirect_uri: `${process.env.BACKEND_URL}/api/users/oauth/google-analytics/callback`,
+            grant_type: "authorization_code",
+        });
 
         const { access_token, refresh_token } = tokenResponse.data;
 
+        // Find user by clerk ID
         const user = await User.findOne({ clerkId });
-
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
+        // Save tokens in user record
         user.googleAnalytics = access_token;
         user.googleRefreshToken = refresh_token;
-
         await user.save();
 
-        res.send("Google Analytics connected successfully!");
-    } catch (error) {
-        console.error("OAuth Error:", error);
-        res.status(500).send("OAuth process failed.");
+        const redirectUrl = parsedState?.redirectUrl || `${process.env.API_URL}/home`;
+        res.redirect(redirectUrl);
+        
+    } catch (error: any) {
+        console.error("OAuth Error:", error.response?.data || error.message || error);
+        return res.status(500).json({
+            error: "OAuth process failed.",
+            details: error.response?.data || error.message || "Unknown error occurred",
+        });
     }
 };
+
+export const getAllAccounts = async (req: Request, res: Response) => {
+    const clerkId = req.query.clerkId as string;
+
+    if (!clerkId) {
+        return res.status(400).send("Clerk ID is required.");
+    }
+
+    try {
+        const user = await User.findOne({ clerkId });
+        if (!user) return res.status(404).send("User not found");
+
+        const oauth2Client = new google.auth.OAuth2(
+            process.env.CLIENT_ID,
+            process.env.CLIENT_SECRET,
+            process.env.REDIRECT_URI
+        );
+
+        oauth2Client.setCredentials({
+            access_token: user.googleAnalytics,
+            refresh_token: user.googleRefreshToken,
+        });
+
+        const analyticsAdmin = google.analyticsadmin('v1beta');
+        const accountsResponse = await analyticsAdmin.accounts.list({ auth: oauth2Client });
+
+        const accounts = accountsResponse.data.accounts || [];
+        res.json(accounts);
+    } catch (error) {
+        console.error("Error fetching GA4 accounts:", error);
+        res.status(500).send("Failed to fetch accounts.");
+    }
+};
+
+
+export const getAnalytics = async (req: Request, res: Response) => {
+    const { clerkId, accountId } = req.query;
+
+    if (!clerkId) {
+        return res.status(400).json({ error: "Clerk ID is required." });
+    }
+
+    try {
+        // Fetch the user from the database
+        const user = await User.findOne({ clerkId });
+        if (!user) return res.status(404).json({ error: "User not found." });
+
+        // Initialize OAuth client
+        const oauth2Client = new google.auth.OAuth2(
+            process.env.CLIENT_ID,
+            process.env.CLIENT_SECRET,
+            process.env.REDIRECT_URI
+        );
+
+        oauth2Client.setCredentials({
+            access_token: user.googleAnalytics,
+            refresh_token: user.googleRefreshToken,
+        });
+
+        // Step 1: Fetch all accessible GA4 properties
+        const analyticsAdmin = google.analyticsadmin("v1beta");
+        const propertiesResponse = await analyticsAdmin.properties.list({
+            filter: `parent:${accountId}`,
+            auth: oauth2Client,
+        });
+
+        const properties = propertiesResponse.data.properties || [];
+        console.log("🚀 ~ getAnalytics ~ properties:", properties)
+        if (!properties || properties.length === 0) {
+            return res.status(404).json({ error: "No GA4 properties found." });
+        }
+
+        // Select the first property (or allow user selection)
+        const propertyId = properties[1]?.name;
+
+        if (!propertyId) {
+            return res.status(400).json({ error: "Invalid property ID." });
+        }        
+
+        // Step 2: Fetch analytics report using the Data API
+        const analyticsData = google.analyticsdata("v1beta");
+        
+        const reportResponse = await analyticsData.properties.runReport({
+            auth: oauth2Client,
+            property: propertyId, // GA4 property ID
+            requestBody: {
+                dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+                metrics: [{ name: "activeUsers" }],
+                dimensions: [{ name: "date" }],
+                "returnPropertyQuota": true
+                // Optional filter example:
+                // filtersExpression: 'date >= "2023-01-01"', // Adjust as needed
+            },
+        });
+
+        // Return the analytics report
+        res.json(reportResponse.data);
+    } catch (error: any) {
+        console.error("Error fetching GA4 analytics report:", error);
+        
+        // Check if error has specific details
+        if (error.response) {
+            return res.status(error.response.status).json({ error: error.response.data });
+        }
+        
+        res.status(500).json({ error: "Failed to fetch analytics report." });
+    }
+};
+
 
 export const deleteNote = async (req: Request, res: Response) => {
     const { noteIds, workspaceId } = req.body;
 
     if (!noteIds || !Array.isArray(noteIds)) {
-        return res
-            .status(400)
-            .json({
-                message: "Invalid payload. Expected an array of note IDs.",
-            });
+        return res.status(400).json({
+            message: "Invalid payload. Expected an array of note IDs.",
+        });
     }
 
     try {
-
         const result = await Note.deleteMany({ _id: { $in: noteIds } });
 
         if (result.deletedCount === 0) {
@@ -362,8 +480,8 @@ export const deleteNote = async (req: Request, res: Response) => {
         if (workspaceId) {
             const workspaceUpdate = await Workspace.findByIdAndUpdate(
                 workspaceId,
-                { $pull: { notes: { $in: noteIds } } }, 
-                { new: true } 
+                { $pull: { notes: { $in: noteIds } } },
+                { new: true }
             );
 
             if (!workspaceUpdate) {

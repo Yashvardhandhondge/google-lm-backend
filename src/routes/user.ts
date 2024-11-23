@@ -18,6 +18,8 @@ import {
     renameSource,
     removeSource,
     renameWorkspace,
+    getAnalytics,
+    getAllAccounts
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
@@ -80,5 +82,11 @@ router.put("/rename-workspace", renameWorkspace);
 
 // @ts-ignore
 router.get('/oauth/google-analytics/callback', googleAnalytics);
+
+// @ts-ignore
+router.get('/analytics/accounts', getAllAccounts)
+
+// @ts-ignore
+router.get('/analytics/report', getAnalytics);
 
 export default router;
