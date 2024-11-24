@@ -17,6 +17,12 @@ import { google } from "googleapis";
 
 dotenv.config();
 
+const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+);
+
 export const createUser = async (req: Request, res: Response) => {
     const { email, clerkId } = req.body;
 
@@ -361,12 +367,6 @@ export const getAllAccounts = async (req: Request, res: Response) => {
         const user = await User.findOne({ clerkId });
         if (!user) return res.status(404).send("User not found");
 
-        const oauth2Client = new google.auth.OAuth2(
-            process.env.CLIENT_ID,
-            process.env.CLIENT_SECRET,
-            process.env.REDIRECT_URI
-        );
-
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
             refresh_token: user.googleRefreshToken,
@@ -396,13 +396,6 @@ export const getAnalytics = async (req: Request, res: Response) => {
         const user = await User.findOne({ clerkId });
         if (!user) return res.status(404).json({ error: "User not found." });
 
-        // Initialize OAuth client
-        const oauth2Client = new google.auth.OAuth2(
-            process.env.CLIENT_ID,
-            process.env.CLIENT_SECRET,
-            process.env.REDIRECT_URI
-        );
-
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
             refresh_token: user.googleRefreshToken,
@@ -416,7 +409,6 @@ export const getAnalytics = async (req: Request, res: Response) => {
         });
 
         const properties = propertiesResponse.data.properties || [];
-        console.log("🚀 ~ getAnalytics ~ properties:", properties)
         if (!properties || properties.length === 0) {
             return res.status(404).json({ error: "No GA4 properties found." });
         }
