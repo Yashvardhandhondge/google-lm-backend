@@ -9,6 +9,7 @@ import {
     uploadFiles,
     extractTextFromFile,
     respondToConversation,
+    summarizeWorkspace,
 } from "../services/Source";
 import Source from "../models/Source";
 import axios from "axios";
@@ -383,8 +384,7 @@ export const getAllAccounts = async (req: Request, res: Response) => {
     }
 };
 
-
-export const getAnalytics = async (req: Request, res: Response) => {
+export const getGaProperties = async (req: Request, res: Response) => {
     const { clerkId, accountId } = req.query;
 
     if (!clerkId) {
@@ -413,27 +413,50 @@ export const getAnalytics = async (req: Request, res: Response) => {
             return res.status(404).json({ error: "No GA4 properties found." });
         }
 
-        // Select the first property (or allow user selection)
-        const propertyId = properties[1]?.name;
+        // Return the list of properties
+        res.json({ properties });
+    } catch (error: any) {
+        console.error("Error fetching GA4 properties:", error);
+        
+        // Check if error has specific details
+        if (error.response) {
+            return res.status(error.response.status).json({ error: error.response.data });
+        }
+        
+        res.status(500).json({ error: "Failed to fetch GA4 properties." });
+    }
+};
 
-        if (!propertyId) {
-            return res.status(400).json({ error: "Invalid property ID." });
-        }        
+export const getGaReport = async (req: Request, res: Response) => {
+    const { clerkId, propertyId } = req.query;
+
+    if (!clerkId || !propertyId) {
+        return res.status(400).json({ error: "Clerk ID and Property ID are required." });
+    }
+
+    try {
+        // Fetch the user from the database
+        const user = await User.findOne({ clerkId });
+        if (!user) return res.status(404).json({ error: "User not found." });
+
+        oauth2Client.setCredentials({
+            access_token: user.googleAnalytics,
+            refresh_token: user.googleRefreshToken,
+        });
 
         // Step 2: Fetch analytics report using the Data API
         const analyticsData = google.analyticsdata("v1beta");
         
         const reportResponse = await analyticsData.properties.runReport({
             auth: oauth2Client,
-            property: propertyId, // GA4 property ID
+            property: propertyId as string,
             requestBody: {
                 dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
                 metrics: [{ name: "activeUsers" }],
                 dimensions: [{ name: "date" }],
-                "returnPropertyQuota": true
-                // Optional filter example:
-                // filtersExpression: 'date >= "2023-01-01"', // Adjust as needed
+                returnPropertyQuota: true, // Fixed property (do not use quotes)
             },
+             // Make sure auth is passed correctly
         });
 
         // Return the analytics report
@@ -446,7 +469,39 @@ export const getAnalytics = async (req: Request, res: Response) => {
             return res.status(error.response.status).json({ error: error.response.data });
         }
         
-        res.status(500).json({ error: "Failed to fetch analytics report." });
+        res.status(500).json({ error: "Failed to fetch GA4 analytics report." });
+    }
+};
+
+export const generateReport = async (req: Request, res: Response) => {
+    const { workspaceId } = req.params;
+
+    try {
+        // Fetch the workspace with populated notes and sources
+        const workspace = await Workspace.findById(workspaceId)
+            .populate("notes")
+            .populate("sources");
+
+        if (!workspace) {
+            return res.status(404).json({ error: "Workspace not found." });
+        }
+
+        // Extract notes and sources content
+        const notes = workspace.notes.map((note: any) => note.content); // Replace 'content' with the actual field name
+        const sources = workspace.sources.map((source: any) => source.summary); // Replace 'content' with the actual field name
+
+        // Summarize using OpenAI
+        const summary = await summarizeWorkspace({
+            notes,
+            sources,
+            workspaceName: workspace.name,
+        });
+
+        // Return the summary as a response
+        res.json({ summary });
+    } catch (error) {
+        console.error("Error generating report:", error);
+        res.status(500).json({ error: "An error occurred while generating the report." });
     }
 };
 
@@ -531,7 +586,6 @@ export const renameSource = async (req: Request, res: Response) => {
 export const removeSource = async (req: Request, res: Response) => {
     const { _id, workspaceId } = req.body;
 
-    // Validate input
     if (!_id) {
         return res.status(400).json({
             message: "Invalid request. '_id' is required.",
@@ -539,7 +593,6 @@ export const removeSource = async (req: Request, res: Response) => {
     }
 
     try {
-        // Delete the source from the Source collection
         const deletedSource = await Source.findByIdAndDelete(_id);
 
         if (!deletedSource) {

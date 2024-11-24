@@ -14,21 +14,10 @@ dotenv.config();
 
 const openAIApiKey = process.env.OPENAI_API_KEY;
 
-const MAX_TOKENS = 300;
-
-function truncateText(text: string): string {
-    const words = text.split(" ");
-    return words.slice(0, MAX_TOKENS).join(" ");
-}
-
 export async function getContentThroughUrl(url: string): Promise<string> {
     const { data: html } = await axios.get(url);
     const $ = cheerio.load(html);
-    const content = truncateText($("body").text());
-    if (!content) {
-        throw new Error("No content found to summarize.");
-    }
-    return content;
+    return $("body").text();
 }
 
 export async function summarizeContent(content: string): Promise<string> {
@@ -126,5 +115,60 @@ export const respondToConversation = async ({
     } catch (error: any) {
         console.error(error.response?.data || error.message);
         throw new Error("Failed to retrieve the response from ChatGPT");
+    }
+};
+
+export const summarizeWorkspace = async ({
+    notes,
+    sources,
+    workspaceName,
+}: {
+    notes: string[];
+    sources: string[];
+    workspaceName: string;
+}): Promise<string> => {
+    try {
+        const prompt = `
+            Please provide a detailed report and key insights for the following workspace:
+            Workspace Name: ${workspaceName}
+            Notes: ${notes.join("\n\n")}
+            Sources: ${sources.join("\n\n")}
+            Please provide in points, first for all the notes and then for all the sources.
+        `;
+
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-3.5-turbo",
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            "You are an AI assistant. Summarize and provide insights based on the provided data.",
+                    },
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ],
+                max_tokens: 3000,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        const summaryContent = response.data.choices?.[0]?.message?.content;
+        if (!summaryContent) {
+            throw new Error("No summary content received in the response");
+        }
+
+        return summaryContent;
+    } catch (error: any) {
+        console.error(error.response?.data || error.message);
+        throw new Error("Failed to retrieve summary from OpenAI");
     }
 };

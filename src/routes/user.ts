@@ -18,17 +18,17 @@ import {
     renameSource,
     removeSource,
     renameWorkspace,
-    getAnalytics,
-    getAllAccounts
+    getGaReport,
+    getAllAccounts,
+    getGaProperties,
+    generateReport
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-
 const router = Router();
-
 
 router.post("/signup", createUser);
 
@@ -36,19 +36,22 @@ router.post("/signup", createUser);
 router.get("getUser/:clerkId", ClerkExpressRequireAuth(), getUser);
 
 // @ts-ignore
-router.get("/getAiKey/:clerkId", ClerkExpressRequireAuth(),  getOpenAikey);
+router.get("/getAiKey/:clerkId", ClerkExpressRequireAuth(), getOpenAikey);
 
 // @ts-ignore
 router.post("/saveApiKey/:clerkId", ClerkExpressRequireAuth(), saveOpenAikey);
 
 // @ts-ignore
-router.post("/createNewWorkspace/:clerkId", ClerkExpressRequireAuth(), createNewWorkspace);
+router.post("/createNewWorkspace/:clerkId",ClerkExpressRequireAuth(),createNewWorkspace
+);
 
 // @ts-ignore
-router.get("/getAllWorkspaces/:clerkId", ClerkExpressRequireAuth(), getAllWorkspaces);
+router.get("/getAllWorkspaces/:clerkId",ClerkExpressRequireAuth(), getAllWorkspaces
+);
 
 // @ts-ignore
-router.get("/getWorkspace/:workspaceId", ClerkExpressRequireAuth(),  getWorkspace);
+router.get("/getWorkspace/:workspaceId",ClerkExpressRequireAuth(),getWorkspace
+);
 
 // @ts-ignore
 router.post("/createNewNote/:workspaceId", ClerkExpressRequireAuth(), createNewNote);
@@ -60,33 +63,41 @@ router.get("/getAllNotes/:workspaceId", ClerkExpressRequireAuth(), getAllNotes);
 router.put("/updateNote/:noteId", ClerkExpressRequireAuth(), updateNote);
 
 // @ts-ignore
-router.delete("/deleteNote", ClerkExpressRequireAuth(), deleteNote);
+router.delete("/deleteNotes", ClerkExpressRequireAuth(), deleteNote);
 
 // @ts-ignore
-router.post("/createSource/:workspaceId", ClerkExpressRequireAuth(), upload.single("file"), createSource);
+router.post("/createSource/:workspaceId", ClerkExpressRequireAuth(), upload.single("file"), createSource
+);
 
 // @ts-ignore
-router.get("/getAllSources/:workspaceId", ClerkExpressRequireAuth(), getAllSources);
+router.get("/getAllSources/:workspaceId", ClerkExpressRequireAuth(), getAllSources
+);
+
+router.post("/createConversation", ClerkExpressRequireAuth(), createConversation
+);
 
 // @ts-ignore
-router.post('/createConversation', ClerkExpressRequireAuth(), createConversation);
+router.put("/rename-source", ClerkExpressRequireAuth(), renameSource);
 
 // @ts-ignore
-router.put("/rename-source", renameSource);
+router.delete("/remove-source", ClerkExpressRequireAuth(), removeSource);
 
 // @ts-ignore
-router.delete("/remove-source", removeSource);
+router.put("/rename-workspace", ClerkExpressRequireAuth(), renameWorkspace);
 
 // @ts-ignore
-router.put("/rename-workspace", renameWorkspace);
+router.get("/oauth/google-analytics/callback",ClerkExpressRequireAuth(), googleAnalytics);
 
 // @ts-ignore
-router.get('/oauth/google-analytics/callback', googleAnalytics);
+router.get("/analytics/accounts", ClerkExpressRequireAuth(), getAllAccounts);
 
 // @ts-ignore
-router.get('/analytics/accounts', getAllAccounts)
+router.get("/analytics/report", ClerkExpressRequireAuth(), getGaReport);
 
 // @ts-ignore
-router.get('/analytics/report', getAnalytics);
+router.get("/analytics/properties", ClerkExpressRequireAuth(), getGaProperties);
+
+// @ts-ignore
+router.get("/getWorkspace-report/:workspaceId", ClerkExpressRequireAuth(), generateReport);
 
 export default router;
