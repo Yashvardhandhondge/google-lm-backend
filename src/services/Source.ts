@@ -15,9 +15,15 @@ dotenv.config();
 const openAIApiKey = process.env.OPENAI_API_KEY;
 
 export async function getContentThroughUrl(url: string): Promise<string> {
-    const { data: html } = await axios.get(url);
-    const $ = cheerio.load(html);
-    return $("body").text();
+    try {
+        const { data: html } = await axios.get(url);
+        const $ = cheerio.load(html);
+        const bodyText = $("body").text().trim();
+        return bodyText ? bodyText.substring(0, 3000) : "No content found.";
+    } catch (error: any) {
+        console.error("Error fetching content:", error.message);
+        return "Failed to fetch content.";
+    }
 }
 
 export async function summarizeContent(content: string): Promise<string> {
@@ -28,14 +34,15 @@ export async function summarizeContent(content: string): Promise<string> {
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                    content:
+                        "You are an AI trained to summarize text content in a concise and informative manner.",
                 },
                 {
                     role: "user",
-                    content: `Please summarize the following content in 500 words:\n\n${content}`,
+                    content: `Please summarize the following content in atmost 1000 words:\n\n${content}`,
                 },
             ],
-            max_tokens: 3000, 
+            max_tokens: 3000,
         },
         {
             headers: {
@@ -52,7 +59,6 @@ export async function summarizeContent(content: string): Promise<string> {
 
     return messageContent;
 }
-
 
 export const uploadFiles = async (file: Express.Multer.File) => {
     const metadata = {

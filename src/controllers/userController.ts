@@ -227,6 +227,7 @@ export const createSource = async (req: Request, res: Response) => {
         } else if (uploadType === "url" && url) {
             // If URL is provided, process it as usual
             const content = await getContentThroughUrl(url);
+
             const summary = await summarizeContent(content);
 
             const newSource = new Source({
@@ -452,7 +453,7 @@ export const getGaReport = async (req: Request, res: Response) => {
             property: propertyId as string,
             requestBody: {
                 dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: [{ name: "activeUsers" }],
+                metrics: [{ name: "activeUsers",  }],
                 dimensions: [{ name: "date" }],
                 returnPropertyQuota: true, // Fixed property (do not use quotes)
             },
