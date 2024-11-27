@@ -98,6 +98,6 @@ router.get("/analytics/report", ClerkExpressRequireAuth(), getGaReport);
 router.get("/analytics/properties", ClerkExpressRequireAuth(), getGaProperties);
 
 // @ts-ignore
-router.get("/getWorkspace-report/:workspaceId", ClerkExpressRequireAuth(), generateReport);
+router.post("/getWorkspace-report/:workspaceId", ClerkExpressRequireAuth(), generateReport);
 
 export default router;

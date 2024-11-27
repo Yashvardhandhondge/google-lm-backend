@@ -6,22 +6,25 @@ export interface ISource extends Document {
     summary: string;
 }
 
-const sourceSchema: Schema = new Schema({
-    url: {
-        type: String,
-        required: true
-    }, 
-    summary: {
-        type: String,
-        required: true
+const sourceSchema: Schema = new Schema(
+    {
+        url: {
+            type: String,
+            required: true,
+        },
+        summary: {
+            type: String,
+            required: true,
+        },
+        name: {
+            type: String,
+        },
+        uploadType: {
+            type: String,
+        },
     },
-    name: {
-        type: String,
-    },
-    uploadType: {
-        type: String
-    }
-});
+    { timestamps: true }
+);
 
 const Source = mongoose.model<ISource>("Source", sourceSchema);
 export default Source;

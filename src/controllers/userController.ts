@@ -67,6 +67,8 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
 
         res.status(200).json({
             message: "API saved successfully",
+            api: user.openAikey === "" ? false : true,
+            googleAnalytics: user.googleAnalytics === "" ? false : true,
         });
     } catch (error) {
         res.status(500).json({ error: "Error fetching user data" });
@@ -476,6 +478,23 @@ export const getGaReport = async (req: Request, res: Response) => {
 
 export const generateReport = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
+    const { startDate, endDate } = req.body;
+
+    // Validate date inputs
+    if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required." });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date format." });
+    }
+
+    if (start > end) {
+        return res.status(400).json({ error: "Start date cannot be greater than end date." });
+    }
 
     try {
         // Fetch the workspace with populated notes and sources
@@ -487,14 +506,25 @@ export const generateReport = async (req: Request, res: Response) => {
             return res.status(404).json({ error: "Workspace not found." });
         }
 
-        // Extract notes and sources content
-        const notes = workspace.notes.map((note: any) => note.content); // Replace 'content' with the actual field name
-        const sources = workspace.sources.map((source: any) => source.summary); // Replace 'content' with the actual field name
+        // Filter notes and sources based on the date range
+        const filteredNotes = workspace.notes.filter((note: any) => {
+            const noteDate = new Date(note.createdAt); // Adjust the field name as necessary
+            return noteDate >= start && noteDate <= end;
+        });
+
+        const filteredSources = workspace.sources.filter((source: any) => {
+            const sourceDate = new Date(source.createdAt); // Adjust the field name as necessary
+            return sourceDate >= start && sourceDate <= end;
+        });
+
+        // Extract content for summarization
+        const notesContent = filteredNotes.map((note: any) => note.content); // Replace 'content' with the actual field name
+        const sourcesContent = filteredSources.map((source: any) => source.summary); // Replace 'summary' with the actual field name
 
         // Summarize using OpenAI
         const summary = await summarizeWorkspace({
-            notes,
-            sources,
+            notes: notesContent,
+            sources: sourcesContent,
             workspaceName: workspace.name,
         });
 
@@ -505,6 +535,7 @@ export const generateReport = async (req: Request, res: Response) => {
         res.status(500).json({ error: "An error occurred while generating the report." });
     }
 };
+
 
 
 export const deleteNote = async (req: Request, res: Response) => {
