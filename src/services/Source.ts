@@ -178,3 +178,41 @@ export const summarizeWorkspace = async ({
         throw new Error("Failed to retrieve summary from OpenAI");
     }
 };
+
+export const pullDataAnalysis = async (context: any): Promise<string> => {
+    try {
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-3.5-turbo",
+                messages: [
+                    {
+                        role: "system",
+                        content: JSON.stringify(context),
+                    },
+                    {
+                        role: "user",
+                        content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis.`,
+                    },
+                ],
+                max_tokens: 3000,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${openAIApiKey}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        const messageContent = response.data.choices?.[0]?.message?.content;
+        if (!messageContent) {
+            throw new Error("No content received in the response");
+        }
+
+        return messageContent;
+    } catch (error: any) {
+        console.error(error.response?.data || error.message);
+        throw new Error("Failed to retrieve the response from ChatGPT");
+    }
+};

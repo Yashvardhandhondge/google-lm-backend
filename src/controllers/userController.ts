@@ -10,11 +10,13 @@ import {
     extractTextFromFile,
     respondToConversation,
     summarizeWorkspace,
+    pullDataAnalysis,
 } from "../services/Source";
 import Source from "../models/Source";
 import axios from "axios";
 import dotenv from "dotenv";
 import { google } from "googleapis";
+import { messaging } from "firebase-admin";
 
 dotenv.config();
 
@@ -311,11 +313,17 @@ export const googleAnalytics = async (req: Request, res: Response) => {
     const state = req.query.state;
 
     if (Array.isArray(state)) {
-        return res.status(400).send("Invalid state parameter: expected a single value, but got an array.");
+        return res
+            .status(400)
+            .send(
+                "Invalid state parameter: expected a single value, but got an array."
+            );
     }
 
-    if (typeof state !== 'string') {
-        return res.status(400).send("Invalid state parameter: expected a string.");
+    if (typeof state !== "string") {
+        return res
+            .status(400)
+            .send("Invalid state parameter: expected a string.");
     }
 
     const parsedState = JSON.parse(decodeURIComponent(state));
@@ -327,13 +335,16 @@ export const googleAnalytics = async (req: Request, res: Response) => {
 
     try {
         // Exchange authorization code for access token
-        const tokenResponse = await axios.post("https://oauth2.googleapis.com/token", {
-            code: req.query.code,
-            client_id: process.env.CLIENT_ID,
-            client_secret: process.env.CLIENT_SECRET,
-            redirect_uri: `${process.env.BACKEND_URL}/api/users/oauth/google-analytics/callback`,
-            grant_type: "authorization_code",
-        });
+        const tokenResponse = await axios.post(
+            "https://oauth2.googleapis.com/token",
+            {
+                code: req.query.code,
+                client_id: process.env.CLIENT_ID,
+                client_secret: process.env.CLIENT_SECRET,
+                redirect_uri: `${process.env.BACKEND_URL}/api/users/oauth/google-analytics/callback`,
+                grant_type: "authorization_code",
+            }
+        );
 
         const { access_token, refresh_token } = tokenResponse.data;
 
@@ -348,14 +359,20 @@ export const googleAnalytics = async (req: Request, res: Response) => {
         user.googleRefreshToken = refresh_token;
         await user.save();
 
-        const redirectUrl = parsedState?.redirectUrl || `${process.env.API_URL}/home`;
+        const redirectUrl =
+            parsedState?.redirectUrl || `${process.env.API_URL}/home`;
         res.redirect(redirectUrl);
-        
     } catch (error: any) {
-        console.error("OAuth Error:", error.response?.data || error.message || error);
+        console.error(
+            "OAuth Error:",
+            error.response?.data || error.message || error
+        );
         return res.status(500).json({
             error: "OAuth process failed.",
-            details: error.response?.data || error.message || "Unknown error occurred",
+            details:
+                error.response?.data ||
+                error.message ||
+                "Unknown error occurred",
         });
     }
 };
@@ -376,8 +393,10 @@ export const getAllAccounts = async (req: Request, res: Response) => {
             refresh_token: user.googleRefreshToken,
         });
 
-        const analyticsAdmin = google.analyticsadmin('v1beta');
-        const accountsResponse = await analyticsAdmin.accounts.list({ auth: oauth2Client });
+        const analyticsAdmin = google.analyticsadmin("v1beta");
+        const accountsResponse = await analyticsAdmin.accounts.list({
+            auth: oauth2Client,
+        });
 
         const accounts = accountsResponse.data.accounts || [];
         res.json(accounts);
@@ -420,12 +439,14 @@ export const getGaProperties = async (req: Request, res: Response) => {
         res.json({ properties });
     } catch (error: any) {
         console.error("Error fetching GA4 properties:", error);
-        
+
         // Check if error has specific details
         if (error.response) {
-            return res.status(error.response.status).json({ error: error.response.data });
+            return res
+                .status(error.response.status)
+                .json({ error: error.response.data });
         }
-        
+
         res.status(500).json({ error: "Failed to fetch GA4 properties." });
     }
 };
@@ -434,7 +455,9 @@ export const getGaReport = async (req: Request, res: Response) => {
     const { clerkId, propertyId } = req.query;
 
     if (!clerkId || !propertyId) {
-        return res.status(400).json({ error: "Clerk ID and Property ID are required." });
+        return res
+            .status(400)
+            .json({ error: "Clerk ID and Property ID are required." });
     }
 
     try {
@@ -449,30 +472,100 @@ export const getGaReport = async (req: Request, res: Response) => {
 
         // Step 2: Fetch analytics report using the Data API
         const analyticsData = google.analyticsdata("v1beta");
-        
+
         const reportResponse = await analyticsData.properties.runReport({
             auth: oauth2Client,
             property: propertyId as string,
             requestBody: {
                 dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: [{ name: "activeUsers",  }],
+                metrics: [
+                    { name: "activeUsers" },
+                    { name: "screenPageViews" },
+                    { name: "eventCount" },
+                    { name: "userEngagementDuration" },
+                    { name: "sessions" },
+                    { name: "newUsers" },
+                    { name: "totalUsers" },
+                ],
                 dimensions: [{ name: "date" }],
                 returnPropertyQuota: true, // Fixed property (do not use quotes)
             },
-             // Make sure auth is passed correctly
         });
 
+        user.propertyId = propertyId as string;
+        await user.save();
+
+        const analysis = await pullDataAnalysis(reportResponse.data);
+
         // Return the analytics report
-        res.json(reportResponse.data);
+        res.json(analysis);
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
-        
+
         // Check if error has specific details
         if (error.response) {
-            return res.status(error.response.status).json({ error: error.response.data });
+            return res
+                .status(error.response.status)
+                .json({ error: error.response.data });
         }
-        
-        res.status(500).json({ error: "Failed to fetch GA4 analytics report." });
+
+        res.status(500).json({
+            error: "Failed to fetch GA4 analytics report.",
+        });
+    }
+};
+
+export const getGaReportForWorkspace = async (req: Request, res: Response) => {
+    const { clerkId, startDate, endDate, metrics } = req.body;
+
+    if (!clerkId || !startDate || !endDate || !metrics || !Array.isArray(metrics)) {
+        return res.status(400).json({ 
+            error: "Clerk ID, startDate, endDate, and metrics are required, and metrics must be an array." 
+        });
+    }
+
+    try {
+        // Fetch the user from the database
+        const user = await User.findOne({ clerkId });
+        if (!user) return res.status(404).json({ error: "User not found." });
+
+        // Set up Google OAuth2 client
+        oauth2Client.setCredentials({
+            access_token: user.googleAnalytics,
+            refresh_token: user.googleRefreshToken,
+        });
+
+        // Fetch analytics report using the Data API
+        const analyticsData = google.analyticsdata("v1beta");
+
+        const reportResponse = await analyticsData.properties.runReport({
+            auth: oauth2Client,
+            property: user.propertyId,
+            requestBody: {
+                dateRanges: [{ startDate, endDate }],
+                metrics: metrics.map((metric: string) => ({ name: metric })), // Map metrics to expected format
+                dimensions: [{ name: "date" }],
+                returnPropertyQuota: true,
+            },
+        });
+
+        const analysis = await pullDataAnalysis(reportResponse.data);
+
+        // Return the analytics report
+        res.json(analysis);
+    } catch (error: any) {
+        console.error("Error fetching GA4 analytics report:", error);
+
+        // Check if error has specific details
+        if (error.response) {
+            return res
+                .status(error.response.status)
+                .json({ error: error.response.data });
+        }
+
+        res.status(500).json({
+            error: "Failed to fetch GA4 analytics report.",
+        });
     }
 };
 
@@ -482,7 +575,9 @@ export const generateReport = async (req: Request, res: Response) => {
 
     // Validate date inputs
     if (!startDate || !endDate) {
-        return res.status(400).json({ error: "Start date and end date are required." });
+        return res
+            .status(400)
+            .json({ error: "Start date and end date are required." });
     }
 
     const start = new Date(startDate);
@@ -493,7 +588,9 @@ export const generateReport = async (req: Request, res: Response) => {
     }
 
     if (start > end) {
-        return res.status(400).json({ error: "Start date cannot be greater than end date." });
+        return res
+            .status(400)
+            .json({ error: "Start date cannot be greater than end date." });
     }
 
     try {
@@ -519,7 +616,9 @@ export const generateReport = async (req: Request, res: Response) => {
 
         // Extract content for summarization
         const notesContent = filteredNotes.map((note: any) => note.content); // Replace 'content' with the actual field name
-        const sourcesContent = filteredSources.map((source: any) => source.summary); // Replace 'summary' with the actual field name
+        const sourcesContent = filteredSources.map(
+            (source: any) => source.summary
+        ); // Replace 'summary' with the actual field name
 
         // Summarize using OpenAI
         const summary = await summarizeWorkspace({
@@ -532,11 +631,11 @@ export const generateReport = async (req: Request, res: Response) => {
         res.json({ summary });
     } catch (error) {
         console.error("Error generating report:", error);
-        res.status(500).json({ error: "An error occurred while generating the report." });
+        res.status(500).json({
+            error: "An error occurred while generating the report.",
+        });
     }
 };
-
-
 
 export const deleteNote = async (req: Request, res: Response) => {
     const { noteIds, workspaceId } = req.body;

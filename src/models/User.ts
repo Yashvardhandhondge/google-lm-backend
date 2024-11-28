@@ -5,6 +5,7 @@ export interface IUser extends Document {
     email: string;
     createdAt: Date;
     openAikey: string;
+    propertyId: string;
     googleAnalytics: string;
     googleRefreshToken: string;
     workspaces: mongoose.Types.ObjectId[];
@@ -20,6 +21,10 @@ const userSchema: Schema = new Schema({
     workspaces: [
         { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: [] },
     ],
+    propertyId: {
+        type: String,
+        default: "",
+    },
 });
 
 const User = mongoose.model<IUser>("User", userSchema);

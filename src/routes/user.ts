@@ -21,7 +21,8 @@ import {
     getGaReport,
     getAllAccounts,
     getGaProperties,
-    generateReport
+    generateReport,
+    getGaReportForWorkspace
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
@@ -93,6 +94,9 @@ router.get("/analytics/accounts", ClerkExpressRequireAuth(), getAllAccounts);
 
 // @ts-ignore
 router.get("/analytics/report", ClerkExpressRequireAuth(), getGaReport);
+
+// @ts-ignore
+router.post("/analytics/report-for-workspace", ClerkExpressRequireAuth(), getGaReportForWorkspace);
 
 // @ts-ignore
 router.get("/analytics/properties", ClerkExpressRequireAuth(), getGaProperties);
