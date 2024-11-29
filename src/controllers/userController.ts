@@ -11,12 +11,12 @@ import {
     respondToConversation,
     summarizeWorkspace,
     pullDataAnalysis,
+    suggetionChat,
 } from "../services/Source";
 import Source from "../models/Source";
 import axios from "axios";
 import dotenv from "dotenv";
 import { google } from "googleapis";
-import { messaging } from "firebase-admin";
 
 dotenv.config();
 
@@ -277,8 +277,21 @@ export const getAllSources = async (req: Request, res: Response) => {
 
 export const createConversation = async (req: Request, res: Response) => {
     const { context, question } = req.body;
+    console.log(req.body)
+    if(context === ',' || question === '')  return res.status(404).json({ message: "Please provide some context"});
     try {
         const resp = await respondToConversation({ context, question });
+        res.status(200).json({ message: resp });
+    } catch (error) {
+        console.error("Error fetching notes:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+export const createConversationOfSuggestion = async (req: Request, res: Response) => {
+    const { question } = req.body;
+    try {
+        const resp = await suggetionChat( question );
         res.status(200).json({ message: resp });
     } catch (error) {
         console.error("Error fetching notes:", error);
@@ -527,7 +540,8 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
     try {
         // Fetch the user from the database
         const user = await User.findOne({ clerkId });
-        if (!user) return res.status(404).json({ error: "User not found." });
+        if (!user) return res.status(404).json({ message: "User not found." });
+        if (user.propertyId) return res.status(404).json({ message: "Please select any analytics account from the home page." });
 
         // Set up Google OAuth2 client
         oauth2Client.setCredentials({
@@ -571,7 +585,7 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
 
 export const generateReport = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
-    const { startDate, endDate } = req.body;
+    const { startDate, endDate, generateReportText } = req.body;
 
     // Validate date inputs
     if (!startDate || !endDate) {
@@ -625,6 +639,7 @@ export const generateReport = async (req: Request, res: Response) => {
             notes: notesContent,
             sources: sourcesContent,
             workspaceName: workspace.name,
+            generateReportText
         });
 
         // Return the summary as a response

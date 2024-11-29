@@ -22,7 +22,8 @@ import {
     getAllAccounts,
     getGaProperties,
     generateReport,
-    getGaReportForWorkspace
+    getGaReportForWorkspace,
+    createConversationOfSuggestion
 } from "../controllers/userController";
 import multer from "multer";
 import { ClerkExpressRequireAuth } from "@clerk/clerk-sdk-node";
@@ -74,7 +75,12 @@ router.post("/createSource/:workspaceId", ClerkExpressRequireAuth(), upload.sing
 router.get("/getAllSources/:workspaceId", ClerkExpressRequireAuth(), getAllSources
 );
 
+// @ts-ignore
 router.post("/createConversation", ClerkExpressRequireAuth(), createConversation
+);
+
+// @ts-ignore
+router.post("/createConversation/suggestion", ClerkExpressRequireAuth(), createConversationOfSuggestion
 );
 
 // @ts-ignore

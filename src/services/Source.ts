@@ -5,6 +5,10 @@ import pdfParse from "pdf-parse";
 import { v4 as uuidv4 } from "uuid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../config/firebase";
+import MarkdownIt from "markdown-it";
+
+const md = new MarkdownIt();
+
 interface ConversationParams {
     context: string;
     question: string;
@@ -26,7 +30,52 @@ export async function getContentThroughUrl(url: string): Promise<string> {
     }
 }
 
+export async function summarizePDFFile(
+    file: Express.Multer.File
+): Promise<string> {
+    if (!file) {
+        throw new Error("Invalid file path provided");
+    }
+    // Step 1: Read the file as binary data
+    const base64PDF = file.buffer.toString("base64");
+
+    // Step 2: Send the file content to OpenAI for summarization
+    const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+            model: "gpt-4-32k", // Use GPT-4 with higher token limits
+            messages: [
+                {
+                    role: "system",
+                    content:
+                        "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.",
+                },
+                {
+                    role: "user",
+                    content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
+                },
+            ],
+            max_tokens: 8000, // Adjust based on the model and expected output
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${openAIApiKey}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    // Step 3: Process the response
+    const messageContent = response.data.choices?.[0]?.message?.content;
+    if (!messageContent) {
+        throw new Error("No content received in the response");
+    }
+
+    return messageContent;
+}
+
 export async function summarizeContent(content: string): Promise<string> {
+    
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -59,6 +108,42 @@ export async function summarizeContent(content: string): Promise<string> {
 
     return messageContent;
 }
+
+export async function suggetionChat(content: string): Promise<string> {
+    
+    const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content:
+                        "You are an AI trained to summarize text content in a concise and informative manner.",
+                },
+                {
+                    role: "user",
+                    content: `${content}`,
+                },
+            ],
+            max_tokens: 3000,
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${openAIApiKey}`,
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    const messageContent = response.data.choices?.[0]?.message?.content;
+    if (!messageContent) {
+        throw new Error("No content received in the response");
+    }
+
+    return messageContent;
+}
+
 
 export const uploadFiles = async (file: Express.Multer.File) => {
     const metadata = {
@@ -128,18 +213,21 @@ export const summarizeWorkspace = async ({
     notes,
     sources,
     workspaceName,
+    generateReportText
 }: {
     notes: string[];
     sources: string[];
     workspaceName: string;
+    generateReportText: string;
 }): Promise<string> => {
     try {
         const prompt = `
             Please provide a detailed report and key insights for the following workspace:
             Workspace Name: ${workspaceName}
             Notes: ${notes.join("\n\n")}
-            Sources: ${sources.join("\n\n")}
+            Sources: ${sources.join("\n\n")} in ${generateReportText}.
             Please provide in points, first for all the notes and then for all the sources.
+            And if any data is present which can be used to create any graph please make that.
         `;
 
         const response = await axios.post(
