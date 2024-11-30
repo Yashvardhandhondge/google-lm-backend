@@ -35,9 +35,9 @@ export const createUser = async (req: Request, res: Response) => {
             email,
         });
         await newUser.save();
-        res.status(201).json(newUser);
+        res.status(201).json({newUser, message: 'Successfully Signed In'});
     } catch (error) {
-        res.status(500).json({ error: "Error saving user data" });
+        res.status(500).json({ message: "Error saving user data" });
     }
 };
 
@@ -47,11 +47,11 @@ export const getUser = async (req: Request, res: Response) => {
     try {
         const user = await User.findOne({ clerkId });
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
-        res.status(200).json(user);
+        res.status(200).json({user, message: 'Logged in succssfully'});
     } catch (error) {
-        res.status(500).json({ error: "Error fetching user data" });
+        res.status(500).json({ message: "Error fetching user data" });
     }
 };
 
@@ -62,7 +62,7 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
     try {
         const user = await User.findOne({ clerkId });
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
         user.openAikey = api_key;
         await user.save();
@@ -73,7 +73,7 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
             googleAnalytics: user.googleAnalytics === "" ? false : true,
         });
     } catch (error) {
-        res.status(500).json({ error: "Error fetching user data" });
+        res.status(500).json({ message: "Error fetching user data" });
     }
 };
 
@@ -83,15 +83,16 @@ export const getOpenAikey = async (req: Request, res: Response) => {
     try {
         const user = await User.findOne({ clerkId });
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
         res.status(200).json({
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
+            propertyId: user.propertyId === ''? false: true,
         });
     } catch (error) {
-        res.status(500).json({ error: "Error fetching user data" });
+        res.status(500).json({ message: "Error fetching user data" });
     }
 };
 
@@ -101,7 +102,7 @@ export const createNewWorkspace = async (req: Request, res: Response) => {
     try {
         const user = await User.findOne({ clerkId });
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
 
         const newWorkspace = new Workspace({
@@ -117,7 +118,7 @@ export const createNewWorkspace = async (req: Request, res: Response) => {
             workspace: newWorkspace,
         });
     } catch (err) {
-        res.status(500).json({ error: "Error while creating workspace" });
+        res.status(500).json({ message: "Error while creating workspace" });
     }
 };
 
@@ -131,12 +132,12 @@ export const getAllWorkspaces = async (req: Request, res: Response) => {
             })
             .lean();
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json({ workspaces: user.workspaces });
+        res.status(200).json({ workspaces: user.workspaces, message: 'Workspace Fetched' });
     } catch (err) {
-        res.status(500).json({ error: "Error while fetching workspaces" });
+        res.status(500).json({ message: "Error while fetching workspaces" });
     }
 };
 
@@ -145,12 +146,12 @@ export const getWorkspace = async (req: Request, res: Response) => {
     try {
         const workspace = await Workspace.findOne({ _id: workspaceId });
         if (!workspace) {
-            return res.status(404).json({ error: "Workspace not found" });
+            return res.status(404).json({ message: "Workspace not found" });
         }
 
         res.status(200).json({ workspace });
     } catch (err) {
-        res.status(500).json({ error: "Error while fetching workspaces" });
+        res.status(500).json({ message: "Error while fetching workspaces" });
     }
 };
 
@@ -175,7 +176,7 @@ export const createNewNote = async (req: Request, res: Response) => {
         workspace.notes.push(savedNote._id as mongoose.Types.ObjectId);
         await workspace.save();
 
-        res.status(201).json(savedNote);
+        res.status(201).json({savedNote, message: 'Note created successfully'});
     } catch (error) {
         console.error("Error creating note:", error);
         res.status(500).json({ message: "Internal Server Error" });
@@ -227,7 +228,7 @@ export const createSource = async (req: Request, res: Response) => {
             workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
             await workspace.save();
 
-            return res.status(200).json(newSource);
+            return res.status(200).json({newSource, message: 'Source Added'});
         } else if (uploadType === "url" && url) {
             // If URL is provided, process it as usual
             const content = await getContentThroughUrl(url);
@@ -245,7 +246,7 @@ export const createSource = async (req: Request, res: Response) => {
             workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
             await workspace.save();
 
-            return res.status(200).json(newSource);
+            return res.status(200).json({newSource, message: 'Source Added'});
         } else {
             return res.status(400).json({
                 message: "Invalid input. Either a file or URL is required.",
@@ -328,22 +329,22 @@ export const googleAnalytics = async (req: Request, res: Response) => {
     if (Array.isArray(state)) {
         return res
             .status(400)
-            .send(
-                "Invalid state parameter: expected a single value, but got an array."
-            );
+            .json({
+                message: "Invalid state parameter: expected a single value, but got an array."
+            });
     }
 
     if (typeof state !== "string") {
         return res
             .status(400)
-            .send("Invalid state parameter: expected a string.");
+            .json({message: "Invalid state parameter: expected a string."});
     }
 
     const parsedState = JSON.parse(decodeURIComponent(state));
     const clerkId = parsedState?.clerkId;
 
     if (!clerkId) {
-        return res.status(400).send("Missing Clerk ID.");
+        return res.status(400).json({message: "Missing Clerk ID."});
     }
 
     try {
@@ -364,7 +365,7 @@ export const googleAnalytics = async (req: Request, res: Response) => {
         // Find user by clerk ID
         const user = await User.findOne({ clerkId });
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({ message: "User not found" });
         }
 
         // Save tokens in user record
@@ -381,7 +382,7 @@ export const googleAnalytics = async (req: Request, res: Response) => {
             error.response?.data || error.message || error
         );
         return res.status(500).json({
-            error: "OAuth process failed.",
+            message: "OAuth process failed.",
             details:
                 error.response?.data ||
                 error.message ||
@@ -394,12 +395,12 @@ export const getAllAccounts = async (req: Request, res: Response) => {
     const clerkId = req.query.clerkId as string;
 
     if (!clerkId) {
-        return res.status(400).send("Clerk ID is required.");
+        return res.status(400).json({message: "Clerk ID is required."});
     }
 
     try {
         const user = await User.findOne({ clerkId });
-        if (!user) return res.status(404).send("User not found");
+        if (!user) return res.status(404).json({message: "User not found"});
 
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -413,23 +414,37 @@ export const getAllAccounts = async (req: Request, res: Response) => {
 
         const accounts = accountsResponse.data.accounts || [];
         res.json(accounts);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching GA4 accounts:", error);
-        res.status(500).send("Failed to fetch accounts.");
+
+        if (error.response?.data?.error === "invalid_grant" || error.response?.data?.error_description?.includes("expired")) {
+            try {
+                await User.updateOne(
+                    { clerkId },
+                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
+                );
+                res.status(410).json({message: 'Token expired, Link again Google Analytics..'})
+            } catch (updateError) {
+                console.error("Error removing tokens:", updateError);
+            }
+        }
+
+        res.status(500).json({message: "Failed to fetch accounts."});
     }
 };
+
 
 export const getGaProperties = async (req: Request, res: Response) => {
     const { clerkId, accountId } = req.query;
 
     if (!clerkId) {
-        return res.status(400).json({ error: "Clerk ID is required." });
+        return res.status(400).json({ message: "Clerk ID is required." });
     }
 
     try {
         // Fetch the user from the database
         const user = await User.findOne({ clerkId });
-        if (!user) return res.status(404).json({ error: "User not found." });
+        if (!user) return res.status(404).json({ message: "User not found." });
 
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -445,7 +460,7 @@ export const getGaProperties = async (req: Request, res: Response) => {
 
         const properties = propertiesResponse.data.properties || [];
         if (!properties || properties.length === 0) {
-            return res.status(404).json({ error: "No GA4 properties found." });
+            return res.status(404).json({ message: "No GA4 properties found." });
         }
 
         // Return the list of properties
@@ -457,35 +472,35 @@ export const getGaProperties = async (req: Request, res: Response) => {
         if (error.response) {
             return res
                 .status(error.response.status)
-                .json({ error: error.response.data });
+                .json({ message: error.response.data });
         }
 
-        res.status(500).json({ error: "Failed to fetch GA4 properties." });
+        res.status(500).json({ message: "Failed to fetch GA4 properties." });
     }
 };
 
 export const getGaReport = async (req: Request, res: Response) => {
     const { clerkId, propertyId } = req.query;
 
+    // Validate required parameters
     if (!clerkId || !propertyId) {
         return res
             .status(400)
-            .json({ error: "Clerk ID and Property ID are required." });
+            .json({ message: "Clerk ID and Property ID are required." });
     }
 
     try {
-        // Fetch the user from the database
         const user = await User.findOne({ clerkId });
-        if (!user) return res.status(404).json({ error: "User not found." });
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
 
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
             refresh_token: user.googleRefreshToken,
         });
 
-        // Step 2: Fetch analytics report using the Data API
         const analyticsData = google.analyticsdata("v1beta");
-
         const reportResponse = await analyticsData.properties.runReport({
             auth: oauth2Client,
             property: propertyId as string,
@@ -501,55 +516,93 @@ export const getGaReport = async (req: Request, res: Response) => {
                     { name: "totalUsers" },
                 ],
                 dimensions: [{ name: "date" }],
-                returnPropertyQuota: true, // Fixed property (do not use quotes)
+                returnPropertyQuota: true,
             },
         });
+
+        const analysis = await pullDataAnalysis(reportResponse.data);
+
+        const newNote = new Note({
+            heading: "Google Analytics",
+            content: analysis,
+            type: "Analytics",
+        });
+        await newNote.save();
+
+        let workspaceId: mongoose.Types.ObjectId;
+
+        if (user.workspaces.length > 0) {
+            workspaceId = user.workspaces[0];
+            const workspace = await Workspace.findOne({_id: workspaceId});
+            workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
+            await workspace?.save();
+        } else {
+            const newWorkspace = new Workspace({
+                name: "New Workspace",
+                notes: [newNote._id],
+            });
+            await newWorkspace.save();
+            
+            user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
+        }
 
         user.propertyId = propertyId as string;
         await user.save();
 
-        const analysis = await pullDataAnalysis(reportResponse.data);
+        const userWorkspaces = await User.findOne({ clerkId })
+            .populate({
+                path: "workspaces",
+                select: "-notes -source",
+            })
+            .lean();
 
-        // Return the analytics report
-        res.json(analysis);
+        res.json({ workspace: userWorkspaces?.workspaces, propertyId: true });
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
 
-        // Check if error has specific details
-        if (error.response) {
-            return res
-                .status(error.response.status)
-                .json({ error: error.response.data });
+        if (
+            error.response?.data?.error === "invalid_grant" ||
+            error.response?.data?.error_description?.includes("expired")
+        ) {
+            try {
+                await User.updateOne(
+                    { clerkId },
+                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
+                );
+                return res.status(410).json({
+                    message: "Token expired. Please re-link your Google Analytics account.",
+                });
+            } catch (updateError) {
+                console.error("Error removing expired tokens:", updateError);
+            }
         }
 
         res.status(500).json({
-            error: "Failed to fetch GA4 analytics report.",
+            message: "Failed to fetch GA4 analytics report.",
         });
     }
 };
+
 
 export const getGaReportForWorkspace = async (req: Request, res: Response) => {
     const { clerkId, startDate, endDate, metrics } = req.body;
 
     if (!clerkId || !startDate || !endDate || !metrics || !Array.isArray(metrics)) {
         return res.status(400).json({ 
-            error: "Clerk ID, startDate, endDate, and metrics are required, and metrics must be an array." 
+            message: "Clerk ID, startDate, endDate, and metrics are required, and metrics must be an array." 
         });
     }
 
     try {
-        // Fetch the user from the database
         const user = await User.findOne({ clerkId });
         if (!user) return res.status(404).json({ message: "User not found." });
-        if (user.propertyId) return res.status(404).json({ message: "Please select any analytics account from the home page." });
+        if (!user.propertyId) return res.status(400).json({ message: "Please select any analytics account from the home page." });
 
-        // Set up Google OAuth2 client
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
             refresh_token: user.googleRefreshToken,
         });
 
-        // Fetch analytics report using the Data API
         const analyticsData = google.analyticsdata("v1beta");
 
         const reportResponse = await analyticsData.properties.runReport({
@@ -565,23 +618,30 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
 
         const analysis = await pullDataAnalysis(reportResponse.data);
 
-        // Return the analytics report
         res.json(analysis);
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
 
-        // Check if error has specific details
-        if (error.response) {
-            return res
-                .status(error.response.status)
-                .json({ error: error.response.data });
+        if (error.response?.data?.error === "invalid_grant" || error.response?.data?.error_description?.includes("expired")) {
+            try {
+                await User.updateOne(
+                    { clerkId },
+                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
+                );
+                return res.status(410).json({
+                    message: "Token expired. Please re-link your Google Analytics account.",
+                });
+            } catch (updateError) {
+                console.error("Error removing tokens from database:", updateError);
+            }
         }
 
         res.status(500).json({
-            error: "Failed to fetch GA4 analytics report.",
+            message: "Failed to fetch GA4 analytics report.",
         });
     }
 };
+
 
 export const generateReport = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
@@ -591,50 +651,47 @@ export const generateReport = async (req: Request, res: Response) => {
     if (!startDate || !endDate) {
         return res
             .status(400)
-            .json({ error: "Start date and end date are required." });
+            .json({ message: "Start date and end date are required." });
     }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        return res.status(400).json({ error: "Invalid date format." });
+        return res.status(400).json({ message: "Invalid date format." });
     }
 
     if (start > end) {
         return res
             .status(400)
-            .json({ error: "Start date cannot be greater than end date." });
+            .json({ message: "Start date cannot be greater than end date." });
     }
 
     try {
-        // Fetch the workspace with populated notes and sources
         const workspace = await Workspace.findById(workspaceId)
             .populate("notes")
             .populate("sources");
 
         if (!workspace) {
-            return res.status(404).json({ error: "Workspace not found." });
+            return res.status(404).json({ message: "Workspace not found." });
         }
 
-        // Filter notes and sources based on the date range
         const filteredNotes = workspace.notes.filter((note: any) => {
-            const noteDate = new Date(note.createdAt); // Adjust the field name as necessary
+            const noteDate = new Date(note.createdAt); 
             return noteDate >= start && noteDate <= end;
         });
 
         const filteredSources = workspace.sources.filter((source: any) => {
-            const sourceDate = new Date(source.createdAt); // Adjust the field name as necessary
+            const sourceDate = new Date(source.createdAt);
             return sourceDate >= start && sourceDate <= end;
         });
 
-        // Extract content for summarization
-        const notesContent = filteredNotes.map((note: any) => note.content); // Replace 'content' with the actual field name
+
+        const notesContent = filteredNotes.map((note: any) => note.content); 
         const sourcesContent = filteredSources.map(
             (source: any) => source.summary
-        ); // Replace 'summary' with the actual field name
+        ); 
 
-        // Summarize using OpenAI
         const summary = await summarizeWorkspace({
             notes: notesContent,
             sources: sourcesContent,
@@ -642,12 +699,11 @@ export const generateReport = async (req: Request, res: Response) => {
             generateReportText
         });
 
-        // Return the summary as a response
         res.json({ summary });
     } catch (error) {
         console.error("Error generating report:", error);
         res.status(500).json({
-            error: "An error occurred while generating the report.",
+            message: "An error occurred while generating the report.",
         });
     }
 };
