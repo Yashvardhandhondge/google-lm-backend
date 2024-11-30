@@ -12,11 +12,10 @@ const md = new MarkdownIt();
 interface ConversationParams {
     context: string;
     question: string;
+    openAIApiKey: string;
 }
 
 dotenv.config();
-
-const openAIApiKey = process.env.OPENAI_API_KEY;
 
 export async function getContentThroughUrl(url: string): Promise<string> {
     try {
@@ -31,7 +30,8 @@ export async function getContentThroughUrl(url: string): Promise<string> {
 }
 
 export async function summarizePDFFile(
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    openAIApiKey: string
 ): Promise<string> {
     if (!file) {
         throw new Error("Invalid file path provided");
@@ -74,7 +74,7 @@ export async function summarizePDFFile(
     return messageContent;
 }
 
-export async function summarizeContent(content: string): Promise<string> {
+export async function summarizeContent(content: string, openAIApiKey: string): Promise<string> {
     
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -109,7 +109,7 @@ export async function summarizeContent(content: string): Promise<string> {
     return messageContent;
 }
 
-export async function suggetionChat(content: string): Promise<string> {
+export async function suggetionChat(content: string, openAIApiKey: string): Promise<string> {
     
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
@@ -157,7 +157,8 @@ export const uploadFiles = async (file: Express.Multer.File) => {
 };
 
 export async function extractTextFromFile(
-    file: Express.Multer.File
+    file: Express.Multer.File,
+    openAIApiKey: string
 ): Promise<string> {
     try {
         const data = await pdfParse(file.buffer);
@@ -171,6 +172,7 @@ export async function extractTextFromFile(
 export const respondToConversation = async ({
     context,
     question,
+    openAIApiKey
 }: ConversationParams): Promise<string> => {
     try {
         const response = await axios.post(
@@ -213,12 +215,14 @@ export const summarizeWorkspace = async ({
     notes,
     sources,
     workspaceName,
-    generateReportText
+    generateReportText, 
+    openAIApiKey
 }: {
     notes: string[];
     sources: string[];
     workspaceName: string;
     generateReportText: string;
+    openAIApiKey: string;
 }): Promise<string> => {
     try {
         const prompt = `
@@ -249,7 +253,7 @@ export const summarizeWorkspace = async ({
             },
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    Authorization: `Bearer ${openAIApiKey}`,
                     "Content-Type": "application/json",
                 },
             }
@@ -267,7 +271,7 @@ export const summarizeWorkspace = async ({
     }
 };
 
-export const pullDataAnalysis = async (context: any): Promise<string> => {
+export const pullDataAnalysis = async (context: any, openAIApiKey: string): Promise<string> => {
     try {
         const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",

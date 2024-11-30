@@ -35,7 +35,7 @@ export const createUser = async (req: Request, res: Response) => {
             email,
         });
         await newUser.save();
-        res.status(201).json({newUser, message: 'Successfully Signed In'});
+        res.status(201).json({ newUser, message: "Successfully Signed In" });
     } catch (error) {
         res.status(500).json({ message: "Error saving user data" });
     }
@@ -49,7 +49,7 @@ export const getUser = async (req: Request, res: Response) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.status(200).json({user, message: 'Logged in succssfully'});
+        res.status(200).json({ user, message: "Logged in succssfully" });
     } catch (error) {
         res.status(500).json({ message: "Error fetching user data" });
     }
@@ -71,6 +71,7 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
+            propertyId: user.propertyId === '' ? false : true
         });
     } catch (error) {
         res.status(500).json({ message: "Error fetching user data" });
@@ -89,7 +90,7 @@ export const getOpenAikey = async (req: Request, res: Response) => {
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
-            propertyId: user.propertyId === ''? false: true,
+            propertyId: user.propertyId === "" ? false : true,
         });
     } catch (error) {
         res.status(500).json({ message: "Error fetching user data" });
@@ -135,7 +136,10 @@ export const getAllWorkspaces = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        res.status(200).json({ workspaces: user.workspaces, message: 'Workspace Fetched' });
+        res.status(200).json({
+            workspaces: user.workspaces,
+            message: "Workspace Fetched",
+        });
     } catch (err) {
         res.status(500).json({ message: "Error while fetching workspaces" });
     }
@@ -176,7 +180,10 @@ export const createNewNote = async (req: Request, res: Response) => {
         workspace.notes.push(savedNote._id as mongoose.Types.ObjectId);
         await workspace.save();
 
-        res.status(201).json({savedNote, message: 'Note created successfully'});
+        res.status(201).json({
+            savedNote,
+            message: "Note created successfully",
+        });
     } catch (error) {
         console.error("Error creating note:", error);
         res.status(500).json({ message: "Internal Server Error" });
@@ -203,7 +210,7 @@ export const getAllNotes = async (req: Request, res: Response) => {
 
 export const createSource = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
-    const { url, uploadType } = req.body;
+    const { url, uploadType, clerkId } = req.body;
     const file = (req.file as Express.Multer.File) ?? null;
 
     try {
@@ -212,10 +219,18 @@ export const createSource = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "Workspace not found" });
         }
 
+        const user = await User.findOne({ clerkId });
+        if (!user) {
+            return res.json({ message: "User not found" });
+        }
+        if (user.openAikey === "") {
+            return res.status(410).json({ message: "Please provide woking OpenAi key" });
+        }
+
         if (uploadType === "file" && req.file) {
             const fileUrl = await uploadFiles(file);
-            const content = await extractTextFromFile(file);
-            const summary = await summarizeContent(content);
+            const content = await extractTextFromFile(file, user.openAikey);
+            const summary = await summarizeContent(content, user.openAikey);
 
             const newSource = new Source({
                 url: fileUrl,
@@ -228,12 +243,12 @@ export const createSource = async (req: Request, res: Response) => {
             workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
             await workspace.save();
 
-            return res.status(200).json({newSource, message: 'Source Added'});
+            return res.status(200).json({ newSource, message: "Source Added" });
         } else if (uploadType === "url" && url) {
             // If URL is provided, process it as usual
             const content = await getContentThroughUrl(url);
 
-            const summary = await summarizeContent(content);
+            const summary = await summarizeContent(content, user.openAikey);
 
             const newSource = new Source({
                 url,
@@ -246,7 +261,7 @@ export const createSource = async (req: Request, res: Response) => {
             workspace.sources.push(newSource._id as mongoose.Types.ObjectId);
             await workspace.save();
 
-            return res.status(200).json({newSource, message: 'Source Added'});
+            return res.status(200).json({ newSource, message: "Source Added" });
         } else {
             return res.status(400).json({
                 message: "Invalid input. Either a file or URL is required.",
@@ -277,11 +292,22 @@ export const getAllSources = async (req: Request, res: Response) => {
 };
 
 export const createConversation = async (req: Request, res: Response) => {
-    const { context, question } = req.body;
-    console.log(req.body)
-    if(context === ',' || question === '')  return res.status(404).json({ message: "Please provide some context"});
+    const { context, question, clerkId } = req.body;
+    const user = await User.findOne({ clerkId });
+    if (!user) {
+        return res.json({ message: "User not found" });
+    }
+    if (user.openAikey === "") {
+        return res.json({ message: "Please provide woking OpenAi key" });
+    }
+    if (context === "," || question === "")
+        return res.status(404).json({ message: "Please provide some context" });
     try {
-        const resp = await respondToConversation({ context, question });
+        const resp = await respondToConversation({
+            context,
+            question,
+            openAIApiKey: user.openAikey,
+        });
         res.status(200).json({ message: resp });
     } catch (error) {
         console.error("Error fetching notes:", error);
@@ -289,10 +315,20 @@ export const createConversation = async (req: Request, res: Response) => {
     }
 };
 
-export const createConversationOfSuggestion = async (req: Request, res: Response) => {
-    const { question } = req.body;
+export const createConversationOfSuggestion = async (
+    req: Request,
+    res: Response
+) => {
+    const { question, clerkId } = req.body;
     try {
-        const resp = await suggetionChat( question );
+        const user = await User.findOne({ clerkId });
+        if (!user) {
+            return res.json({ message: "User not found" });
+        }
+        if (user.openAikey === "") {
+            return res.json({ message: "Please provide woking OpenAi key" });
+        }
+        const resp = await suggetionChat(question, user.openAikey);
         res.status(200).json({ message: resp });
     } catch (error) {
         console.error("Error fetching notes:", error);
@@ -327,24 +363,23 @@ export const googleAnalytics = async (req: Request, res: Response) => {
     const state = req.query.state;
 
     if (Array.isArray(state)) {
-        return res
-            .status(400)
-            .json({
-                message: "Invalid state parameter: expected a single value, but got an array."
-            });
+        return res.status(400).json({
+            message:
+                "Invalid state parameter: expected a single value, but got an array.",
+        });
     }
 
     if (typeof state !== "string") {
         return res
             .status(400)
-            .json({message: "Invalid state parameter: expected a string."});
+            .json({ message: "Invalid state parameter: expected a string." });
     }
 
     const parsedState = JSON.parse(decodeURIComponent(state));
     const clerkId = parsedState?.clerkId;
 
     if (!clerkId) {
-        return res.status(400).json({message: "Missing Clerk ID."});
+        return res.status(400).json({ message: "Missing Clerk ID." });
     }
 
     try {
@@ -395,12 +430,12 @@ export const getAllAccounts = async (req: Request, res: Response) => {
     const clerkId = req.query.clerkId as string;
 
     if (!clerkId) {
-        return res.status(400).json({message: "Clerk ID is required."});
+        return res.status(400).json({ message: "Clerk ID is required." });
     }
 
     try {
         const user = await User.findOne({ clerkId });
-        if (!user) return res.status(404).json({message: "User not found"});
+        if (!user) return res.status(404).json({ message: "User not found" });
 
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -417,22 +452,30 @@ export const getAllAccounts = async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error("Error fetching GA4 accounts:", error);
 
-        if (error.response?.data?.error === "invalid_grant" || error.response?.data?.error_description?.includes("expired")) {
+        if (
+            error.response?.data?.error === "invalid_grant" ||
+            error.response?.data?.error_description?.includes("expired")
+        ) {
             try {
-                await User.updateOne(
-                    { clerkId },
-                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
-                );
-                res.status(410).json({message: 'Token expired, Link again Google Analytics..'})
+                const user = await User.findOne({ clerkId });
+                if (!user) {
+                    return res.json({ message: "User not found" });
+                }
+                user.googleAnalytics = "";
+                user.propertyId = "";
+                user.googleRefreshToken = "";
+                await user.save();
+                res.status(410).json({
+                    message: "Token expired, Link again Google Analytics..",
+                });
             } catch (updateError) {
                 console.error("Error removing tokens:", updateError);
             }
         }
 
-        res.status(500).json({message: "Failed to fetch accounts."});
+        res.status(500).json({ message: "Failed to fetch accounts." });
     }
 };
-
 
 export const getGaProperties = async (req: Request, res: Response) => {
     const { clerkId, accountId } = req.query;
@@ -460,7 +503,9 @@ export const getGaProperties = async (req: Request, res: Response) => {
 
         const properties = propertiesResponse.data.properties || [];
         if (!properties || properties.length === 0) {
-            return res.status(404).json({ message: "No GA4 properties found." });
+            return res
+                .status(404)
+                .json({ message: "No GA4 properties found." });
         }
 
         // Return the list of properties
@@ -495,6 +540,10 @@ export const getGaReport = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found." });
         }
 
+        if(user.openAikey === '') {
+            return res.json({message: 'Please provide OpenAI key'});
+        }
+
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
             refresh_token: user.googleRefreshToken,
@@ -520,7 +569,10 @@ export const getGaReport = async (req: Request, res: Response) => {
             },
         });
 
-        const analysis = await pullDataAnalysis(reportResponse.data);
+        const analysis = await pullDataAnalysis(
+            reportResponse.data,
+            user.openAikey
+        );
 
         const newNote = new Note({
             heading: "Google Analytics",
@@ -533,7 +585,7 @@ export const getGaReport = async (req: Request, res: Response) => {
 
         if (user.workspaces.length > 0) {
             workspaceId = user.workspaces[0];
-            const workspace = await Workspace.findOne({_id: workspaceId});
+            const workspace = await Workspace.findOne({ _id: workspaceId });
             workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
             await workspace?.save();
         } else {
@@ -542,7 +594,7 @@ export const getGaReport = async (req: Request, res: Response) => {
                 notes: [newNote._id],
             });
             await newWorkspace.save();
-            
+
             user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
         }
 
@@ -565,12 +617,19 @@ export const getGaReport = async (req: Request, res: Response) => {
             error.response?.data?.error_description?.includes("expired")
         ) {
             try {
-                await User.updateOne(
-                    { clerkId },
-                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
-                );
+                const user = await User.findOne({ clerkId });
+
+                if (!user) {
+                    return res.json({ message: "User not found" });
+                }
+                user.googleAnalytics = "";
+                user.propertyId = "";
+                user.googleRefreshToken = "";
+
+                await user.save();
                 return res.status(410).json({
-                    message: "Token expired. Please re-link your Google Analytics account.",
+                    message:
+                        "Token expired. Please re-link your Google Analytics account.",
                 });
             } catch (updateError) {
                 console.error("Error removing expired tokens:", updateError);
@@ -583,20 +642,34 @@ export const getGaReport = async (req: Request, res: Response) => {
     }
 };
 
-
 export const getGaReportForWorkspace = async (req: Request, res: Response) => {
     const { clerkId, startDate, endDate, metrics } = req.body;
 
-    if (!clerkId || !startDate || !endDate || !metrics || !Array.isArray(metrics)) {
-        return res.status(400).json({ 
-            message: "Clerk ID, startDate, endDate, and metrics are required, and metrics must be an array." 
+    if (
+        !clerkId ||
+        !startDate ||
+        !endDate ||
+        !metrics ||
+        !Array.isArray(metrics)
+    ) {
+        return res.status(400).json({
+            message:
+                "Clerk ID, startDate, endDate, and metrics are required, and metrics must be an array.",
         });
     }
 
     try {
         const user = await User.findOne({ clerkId });
         if (!user) return res.status(404).json({ message: "User not found." });
-        if (!user.propertyId) return res.status(400).json({ message: "Please select any analytics account from the home page." });
+        if (!user.propertyId)
+            return res.status(400).json({
+                message:
+                    "Please select any analytics account from the home page.",
+            });
+
+        if (user.openAikey === "") {
+            return res.json({ message: "Please provide woking OpenAi key" });
+        }
 
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -616,23 +689,39 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
             },
         });
 
-        const analysis = await pullDataAnalysis(reportResponse.data);
+        const analysis = await pullDataAnalysis(
+            reportResponse.data,
+            user.openAikey
+        );
 
         res.json(analysis);
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
 
-        if (error.response?.data?.error === "invalid_grant" || error.response?.data?.error_description?.includes("expired")) {
+        if (
+            error.response?.data?.error === "invalid_grant" ||
+            error.response?.data?.error_description?.includes("expired")
+        ) {
             try {
-                await User.updateOne(
-                    { clerkId },
-                    { $unset: { googleAnalytics: "", googleRefreshToken: "", propertyId: "" } }
-                );
+                const user = await User.findOne({ clerkId });
+
+                if (!user) {
+                    return res.json({ message: "User not found" });
+                }
+                user.googleAnalytics = "";
+                user.propertyId = "";
+                user.googleRefreshToken = "";
+
+                await user.save();
                 return res.status(410).json({
-                    message: "Token expired. Please re-link your Google Analytics account.",
+                    message:
+                        "Token expired. Please re-link your Google Analytics account.",
                 });
             } catch (updateError) {
-                console.error("Error removing tokens from database:", updateError);
+                console.error(
+                    "Error removing tokens from database:",
+                    updateError
+                );
             }
         }
 
@@ -642,10 +731,9 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
     }
 };
 
-
 export const generateReport = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
-    const { startDate, endDate, generateReportText } = req.body;
+    const { startDate, endDate, generateReportText, clerkId } = req.body;
 
     // Validate date inputs
     if (!startDate || !endDate) {
@@ -675,9 +763,16 @@ export const generateReport = async (req: Request, res: Response) => {
         if (!workspace) {
             return res.status(404).json({ message: "Workspace not found." });
         }
+        const user = await User.findOne({ clerkId });
+        if (!user) {
+            return res.json({ message: "User not found" });
+        }
+        if (user.openAikey === "") {
+            return res.json({ message: "Please provide woking OpenAi key" });
+        }
 
         const filteredNotes = workspace.notes.filter((note: any) => {
-            const noteDate = new Date(note.createdAt); 
+            const noteDate = new Date(note.createdAt);
             return noteDate >= start && noteDate <= end;
         });
 
@@ -686,17 +781,17 @@ export const generateReport = async (req: Request, res: Response) => {
             return sourceDate >= start && sourceDate <= end;
         });
 
-
-        const notesContent = filteredNotes.map((note: any) => note.content); 
+        const notesContent = filteredNotes.map((note: any) => note.content);
         const sourcesContent = filteredSources.map(
             (source: any) => source.summary
-        ); 
+        );
 
         const summary = await summarizeWorkspace({
             notes: notesContent,
             sources: sourcesContent,
             workspaceName: workspace.name,
-            generateReportText
+            generateReportText,
+            openAIApiKey: user.openAikey
         });
 
         res.json({ summary });
