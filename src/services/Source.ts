@@ -226,12 +226,13 @@ export const summarizeWorkspace = async ({
 }): Promise<string> => {
     try {
         const prompt = `
-            Please provide a detailed report and key insights for the following workspace:
+            Please create a detailed report with visualization included in form of tables , charts, images from the following data :
             Workspace Name: ${workspaceName}
             Notes: ${notes.join("\n\n")}
             Sources: ${sources.join("\n\n")} in ${generateReportText}.
             Please provide in points, first for all the notes and then for all the sources.
-            And if any data is present please create table with and highlight any important information.
+            And if any data is present please create table with it and highlight any important information.
+            Please give the answer in markdown format
         `;
 
         const response = await axios.post(
