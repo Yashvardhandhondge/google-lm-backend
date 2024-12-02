@@ -231,7 +231,7 @@ export const summarizeWorkspace = async ({
             Notes: ${notes.join("\n\n")}
             Sources: ${sources.join("\n\n")} in ${generateReportText}.
             Please provide in points, first for all the notes and then for all the sources.
-            And if any data is present which can be used to create any graph please make that.
+            And if any data is present please create table with and highlight any important information.
         `;
 
         const response = await axios.post(
