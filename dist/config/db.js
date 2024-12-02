@@ -15,9 +15,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
+const config = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    socketTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 10000,
+    maxIdleTimeMS: 10000,
+};
 const connectDB = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield mongoose_1.default.connect(process.env.MONGODB_URI);
+        yield mongoose_1.default.connect(process.env.MONGODB_URI, config);
         console.log("MongoDB connected");
     }
     catch (error) {
