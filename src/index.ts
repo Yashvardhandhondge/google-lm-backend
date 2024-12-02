@@ -12,13 +12,13 @@ const PORT = process.env.PORT || 5001;
 const API_URL = process.env.API_URL;
 
 app.use(express.json());
-// app.use(
-//     cors({
-//         origin: API_URL,
-//         credentials: true,
-//     })
-// );
-app.use(cors())
+app.use(
+    cors({
+        origin: API_URL,
+        credentials: true,
+    })
+);
+// app.use(cors())
 
 // Clerk Middleware for Authentication
 app.use(ClerkExpressWithAuth());
