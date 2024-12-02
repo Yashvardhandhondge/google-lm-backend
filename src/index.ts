@@ -6,7 +6,7 @@ import cors from "cors";
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 
 dotenv.config();
-
+connectDB();
 const app = express();
 const PORT = process.env.PORT || 5001;
 const API_URL = process.env.API_URL;
@@ -32,7 +32,7 @@ app.get("/", (req, res) => {
 
 app.listen(PORT, async () => {
     // Connect to MongoDB
-    await connectDB();
+    // await connectDB();
     console.log(`Server is running on port ${PORT}`);
 });
 

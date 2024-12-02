@@ -19,6 +19,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 const clerk_sdk_node_1 = require("@clerk/clerk-sdk-node");
 dotenv_1.default.config();
+(0, db_1.default)();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5001;
 const API_URL = process.env.API_URL;
@@ -37,7 +38,7 @@ app.get("/", (req, res) => {
 });
 app.listen(PORT, () => __awaiter(void 0, void 0, void 0, function* () {
     // Connect to MongoDB
-    yield (0, db_1.default)();
+    // await connectDB();
     console.log(`Server is running on port ${PORT}`);
 }));
 exports.default = app;
