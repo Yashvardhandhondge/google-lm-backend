@@ -23,9 +23,6 @@ app.use(
 // Clerk Middleware for Authentication
 app.use(ClerkExpressWithAuth());
 
-// Connect to MongoDB
-connectDB();
-
 // Routes
 app.use("/api/users", userRoutes);
 
@@ -33,7 +30,9 @@ app.get("/", (req, res) => {
     res.send("Hello, World!");
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+    // Connect to MongoDB
+    await connectDB();
     console.log(`Server is running on port ${PORT}`);
 });
 
