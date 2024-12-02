@@ -45,7 +45,7 @@ router.delete("/remove-source", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(),
 // @ts-ignore
 router.put("/rename-workspace", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.renameWorkspace);
 // @ts-ignore
-router.get("/oauth/google-analytics/callback", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.googleAnalytics);
+router.get("/oauth/google-analytics/callback", userController_1.googleAnalytics);
 // @ts-ignore
 router.get("/analytics/accounts", (0, clerk_sdk_node_1.ClerkExpressRequireAuth)(), userController_1.getAllAccounts);
 // @ts-ignore

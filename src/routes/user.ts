@@ -93,7 +93,7 @@ router.delete("/remove-source", ClerkExpressRequireAuth(), removeSource);
 router.put("/rename-workspace", ClerkExpressRequireAuth(), renameWorkspace);
 
 // @ts-ignore
-router.get("/oauth/google-analytics/callback",ClerkExpressRequireAuth(), googleAnalytics);
+router.get("/oauth/google-analytics/callback", googleAnalytics);
 
 // @ts-ignore
 router.get("/analytics/accounts", ClerkExpressRequireAuth(), getAllAccounts);
