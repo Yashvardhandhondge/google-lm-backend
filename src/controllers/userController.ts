@@ -71,7 +71,7 @@ export const saveOpenAikey = async (req: Request, res: Response) => {
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
-            propertyId: user.propertyId === '' ? false : true
+            propertyId: user.propertyId === "" ? false : true,
         });
     } catch (error) {
         res.status(500).json({ message: "Error fetching user data" });
@@ -224,18 +224,28 @@ export const createSource = async (req: Request, res: Response) => {
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(410).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(410)
+                .json({ message: "Please provide woking OpenAi key" });
         }
 
         if (uploadType === "file" && req.file) {
-            const fileUrl = await uploadFiles(file);
+            let fileUrl: string;
+            try {
+                fileUrl = await uploadFiles(file);
+            } catch (error) {
+                return res.status(400).json({
+                    message:
+                        "File upload failed. Please upload a smaller file or try again.",
+                });
+            }
             const content = await extractTextFromFile(file, user.openAikey);
             const summary = await summarizeContent(content, user.openAikey);
 
             const newSource = new Source({
                 url: fileUrl,
                 summary,
-                name: req.file.originalname,
+                name: req.file.originalname.split(".").slice(0, -1).join("."),
                 uploadType,
             });
             await newSource.save();
@@ -540,8 +550,8 @@ export const getGaReport = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found." });
         }
 
-        if(user.openAikey === '') {
-            return res.json({message: 'Please provide OpenAI key'});
+        if (user.openAikey === "") {
+            return res.json({ message: "Please provide OpenAI key" });
         }
 
         oauth2Client.setCredentials({
@@ -791,7 +801,7 @@ export const generateReport = async (req: Request, res: Response) => {
             sources: sourcesContent,
             workspaceName: workspace.name,
             generateReportText,
-            openAIApiKey: user.openAikey
+            openAIApiKey: user.openAikey,
         });
 
         res.json({ summary });
