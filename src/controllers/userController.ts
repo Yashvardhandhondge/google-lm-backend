@@ -208,6 +208,27 @@ export const getAllNotes = async (req: Request, res: Response) => {
     }
 };
 
+function splitContent(content: string, chunkSize: number = 10000): string[] {
+    const chunks: string[] = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+        chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+
+async function summarizeLargeContent(content: string, apiKey: string): Promise<string> {
+    const chunks = splitContent(content);
+
+    let finalSummary = "";
+
+    for (const chunk of chunks) {
+        const summary = await summarizeContent(chunk, apiKey);
+        finalSummary += summary + "\n\n";  
+    }
+
+    return finalSummary.trim();  
+}
+
 export const createSource = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
     const { url, uploadType, clerkId } = req.body;
@@ -240,7 +261,7 @@ export const createSource = async (req: Request, res: Response) => {
                 });
             }
             const content = await extractTextFromFile(file, user.openAikey);
-            const summary = await summarizeContent(content, user.openAikey);
+            const summary = await summarizeLargeContent(content, user.openAikey);
 
             const newSource = new Source({
                 url: fileUrl,
@@ -255,10 +276,9 @@ export const createSource = async (req: Request, res: Response) => {
 
             return res.status(200).json({ newSource, message: "Source Added" });
         } else if (uploadType === "url" && url) {
-            // If URL is provided, process it as usual
             const content = await getContentThroughUrl(url);
 
-            const summary = await summarizeContent(content, user.openAikey);
+            const summary = await summarizeLargeContent(content, user.openAikey);
 
             const newSource = new Source({
                 url,
