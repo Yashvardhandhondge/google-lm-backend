@@ -21,7 +21,10 @@ export async function getContentThroughUrl(url: string): Promise<string> {
     try {
         const { data: html } = await axios.get(url);
         const $ = cheerio.load(html);
-        const bodyText = $("body").text().trim();
+        const bodyText = $("p, h1, h2, h3, span, li")
+            .map((_, element) => $(element).text().trim())
+            .get()
+            .join(" ");
         return bodyText ? bodyText.substring(0, 3000) : "No content found.";
     } catch (error: any) {
         console.error("Error fetching content:", error.message);
@@ -43,19 +46,18 @@ export async function summarizePDFFile(
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-            model: "gpt-4-32k", // Use GPT-4 with higher token limits
+            model: "gpt-4-turbo", 
             messages: [
                 {
                     role: "system",
                     content:
-                        "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.",
+                        "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
                 },
             ],
-            max_tokens: 8000, // Adjust based on the model and expected output
         },
         {
             headers: {
@@ -65,7 +67,6 @@ export async function summarizePDFFile(
         }
     );
 
-    // Step 3: Process the response
     const messageContent = response.data.choices?.[0]?.message?.content;
     if (!messageContent) {
         throw new Error("No content received in the response");
@@ -74,24 +75,25 @@ export async function summarizePDFFile(
     return messageContent;
 }
 
-export async function summarizeContent(content: string, openAIApiKey: string): Promise<string> {
-    
+export async function summarizeContent(
+    content: string,
+    openAIApiKey: string
+): Promise<string> {
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
                     content:
-                        "You are an AI trained to summarize text content in a concise and informative manner.",
+                        "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `Please summarize the following content in atmost 1000 words:\n\n${content}`,
                 },
             ],
-            max_tokens: 3000,
         },
         {
             headers: {
@@ -109,24 +111,25 @@ export async function summarizeContent(content: string, openAIApiKey: string): P
     return messageContent;
 }
 
-export async function suggetionChat(content: string, openAIApiKey: string): Promise<string> {
-    
+export async function suggetionChat(
+    content: string,
+    openAIApiKey: string
+): Promise<string> {
     const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-            model: "gpt-3.5-turbo",
+            model: "gpt-4-turbo",
             messages: [
                 {
                     role: "system",
                     content:
-                        "You are an AI trained to summarize text content in a concise and informative manner.",
+                        "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `${content}`,
                 },
             ],
-            max_tokens: 3000,
         },
         {
             headers: {
@@ -143,7 +146,6 @@ export async function suggetionChat(content: string, openAIApiKey: string): Prom
 
     return messageContent;
 }
-
 
 export const uploadFiles = async (file: Express.Multer.File) => {
     const metadata = {
@@ -172,13 +174,13 @@ export async function extractTextFromFile(
 export const respondToConversation = async ({
     context,
     question,
-    openAIApiKey
+    openAIApiKey,
 }: ConversationParams): Promise<string> => {
     try {
         const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
-                model: "gpt-3.5-turbo",
+                model: "gpt-4-turbo",
                 messages: [
                     {
                         role: "system",
@@ -186,10 +188,9 @@ export const respondToConversation = async ({
                     },
                     {
                         role: "user",
-                        content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side`,
+                        content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
                     },
                 ],
-                max_tokens: 3000,
             },
             {
                 headers: {
@@ -215,8 +216,8 @@ export const summarizeWorkspace = async ({
     notes,
     sources,
     workspaceName,
-    generateReportText, 
-    openAIApiKey
+    generateReportText,
+    openAIApiKey,
 }: {
     notes: string[];
     sources: string[];
@@ -238,19 +239,18 @@ export const summarizeWorkspace = async ({
         const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
-                model: "gpt-3.5-turbo",
+                model: "gpt-4-turbo",
                 messages: [
                     {
                         role: "system",
                         content:
-                            "You are an AI assistant. Summarize and provide insights based on the provided data.",
+                            "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
                     },
                     {
                         role: "user",
                         content: prompt,
                     },
                 ],
-                max_tokens: 3000,
             },
             {
                 headers: {
@@ -272,12 +272,15 @@ export const summarizeWorkspace = async ({
     }
 };
 
-export const pullDataAnalysis = async (context: any, openAIApiKey: string): Promise<string> => {
+export const pullDataAnalysis = async (
+    context: any,
+    openAIApiKey: string
+): Promise<string> => {
     try {
         const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
-                model: "gpt-3.5-turbo",
+                model: "gpt-4-turbo",
                 messages: [
                     {
                         role: "system",
@@ -285,10 +288,9 @@ export const pullDataAnalysis = async (context: any, openAIApiKey: string): Prom
                     },
                     {
                         role: "user",
-                        content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis.`,
+                        content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis. Please give the answer in markdown format`,
                     },
                 ],
-                max_tokens: 3000,
             },
             {
                 headers: {
