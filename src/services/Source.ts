@@ -92,7 +92,7 @@ export async function summarizeContent(
                 },
                 {
                     role: "user",
-                    content: `Please summarize the following content in atmost 1000 words:\n\n${content}`,
+                    content: `Please summarize the following content in atleast 3000 words:\n\n${content}`,
                 },
             ],
         },
