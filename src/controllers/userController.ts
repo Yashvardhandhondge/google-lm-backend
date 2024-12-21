@@ -26,6 +26,21 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.REDIRECT_URI
 );
 
+const matricsArray = [
+    { name: "activeUsers" },
+    { name: "screenPageViews" },
+    { name: "eventCount" },
+    { name: "userEngagementDuration" },
+    { name: "sessions" },
+    { name: "newUsers" },
+    { name: "totalUsers" },
+    { name: "bounceRate" },
+    { name: "totalUsers" },
+    { name: "transactions" },
+    { name: "totalRevenue" },
+    { name: "itemListClickThroughRate" },
+]
+
 export const createUser = async (req: Request, res: Response) => {
     const { email, clerkId } = req.body;
 
@@ -585,15 +600,7 @@ export const getGaReport = async (req: Request, res: Response) => {
             property: propertyId as string,
             requestBody: {
                 dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: [
-                    { name: "activeUsers" },
-                    { name: "screenPageViews" },
-                    { name: "eventCount" },
-                    { name: "userEngagementDuration" },
-                    { name: "sessions" },
-                    { name: "newUsers" },
-                    { name: "totalUsers" },
-                ],
+                metrics: matricsArray,
                 dimensions: [{ name: "date" }],
                 returnPropertyQuota: true,
             },
