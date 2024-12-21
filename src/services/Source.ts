@@ -26,7 +26,7 @@ export async function getContentThroughUrl(url: string): Promise<string> {
             .map((_, element) => $(element).text().trim())
             .get()
             .join(" ");
-        return bodyText ? bodyText.substring(0, 3000) : "No content found.";
+        return bodyText;
     } catch (error: any) {
         console.error("Error fetching content:", error.message);
         return "Failed to fetch content.";
