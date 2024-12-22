@@ -4,14 +4,15 @@ import Workspace from "../models/Workspace";
 import Note from "../models/Note";
 import mongoose from "mongoose";
 import {
-    getContentThroughUrl,
     summarizeContent,
     uploadFiles,
-    extractTextFromFile,
     respondToConversation,
     summarizeWorkspace,
     pullDataAnalysis,
     suggetionChat,
+    summarizePDFFile,
+    extractContent,
+    getContentThroughUrl
 } from "../services/Source";
 import Source from "../models/Source";
 import axios from "axios";
@@ -275,7 +276,7 @@ export const createSource = async (req: Request, res: Response) => {
                         "File upload failed. Please upload a smaller file or try again.",
                 });
             }
-            const content = await extractTextFromFile(file, user.openAikey);
+            const content = await extractContent(file);
             const summary = await summarizeLargeContent(content, user.openAikey);
 
             const newSource = new Source({
@@ -292,7 +293,6 @@ export const createSource = async (req: Request, res: Response) => {
             return res.status(200).json({ newSource, message: "Source Added" });
         } else if (uploadType === "url" && url) {
             const content = await getContentThroughUrl(url);
-
             const summary = await summarizeLargeContent(content, user.openAikey);
 
             const newSource = new Source({
