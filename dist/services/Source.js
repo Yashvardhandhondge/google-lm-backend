@@ -50,14 +50,18 @@ const storage_1 = require("firebase/storage");
 const firebase_1 = require("../config/firebase");
 const markdown_it_1 = __importDefault(require("markdown-it"));
 const md = new markdown_it_1.default();
+const gptModel = "gpt-4-turbo";
 dotenv_1.default.config();
 function getContentThroughUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { data: html } = yield axios_1.default.get(url);
             const $ = cheerio.load(html);
-            const bodyText = $("body").text().trim();
-            return bodyText ? bodyText.substring(0, 3000) : "No content found.";
+            const bodyText = $("p, h1, h2, h3, span, li")
+                .map((_, element) => $(element).text().trim())
+                .get()
+                .join(" ");
+            return bodyText;
         }
         catch (error) {
             console.error("Error fetching content:", error.message);
@@ -75,25 +79,23 @@ function summarizePDFFile(file, openAIApiKey) {
         const base64PDF = file.buffer.toString("base64");
         // Step 2: Send the file content to OpenAI for summarization
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-4-32k", // Use GPT-4 with higher token limits
+            model: gptModel,
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.",
+                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
                 },
             ],
-            max_tokens: 8000, // Adjust based on the model and expected output
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
                 "Content-Type": "application/json",
             },
         });
-        // Step 3: Process the response
         const messageContent = (_c = (_b = (_a = response.data.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content;
         if (!messageContent) {
             throw new Error("No content received in the response");
@@ -105,18 +107,17 @@ function summarizeContent(content, openAIApiKey) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: gptModel,
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
-                    content: `Please summarize the following content in atmost 1000 words:\n\n${content}`,
+                    content: `Please summarize the following content in atleast 3000 words:\n\n${content}`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -134,18 +135,17 @@ function suggetionChat(content, openAIApiKey) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b, _c;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: gptModel,
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: `${content}`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -182,11 +182,11 @@ function extractTextFromFile(file, openAIApiKey) {
         }
     });
 }
-const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, question, openAIApiKey }) {
+const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, question, openAIApiKey, }) {
     var _b, _c, _d, _e;
     try {
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: gptModel,
             messages: [
                 {
                     role: "system",
@@ -194,10 +194,9 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
                 },
                 {
                     role: "user",
-                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side`,
+                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -216,30 +215,157 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
     }
 });
 exports.respondToConversation = respondToConversation;
-const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey }) {
+const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey, }) {
     var _b, _c, _d, _e;
     try {
         const prompt = `
-            Please provide a detailed report and key insights for the following workspace:
-            Workspace Name: ${workspaceName}
-            Notes: ${notes.join("\n\n")}
-            Sources: ${sources.join("\n\n")} in ${generateReportText}.
-            Please provide in points, first for all the notes and then for all the sources.
-            And if any data is present which can be used to create any graph please make that.
-        `;
+Workspace Name: ${workspaceName}
+Notes: 
+${notes.join("\n\n")}
+
+Sources: 
+${sources.join("\n\n")}
+
+Context: ${generateReportText}
+
+Generate a detailed website performance report including all the below-listed points using the data and context provided above:
+
+Summary: A concise overview of the website's performance, key trends, and highlights.
+
+Analysis: A detailed breakdown of:
+- Traffic: Include metrics like page views, unique visitors, and traffic sources. Suggest using a bar chart for visualization.
+- User Behavior: Metrics such as bounce rate, session duration, and user flow. Suggest using a line chart for visualization.
+- Engagement: Include data on click-through rates, conversion rates, and user interactions. Suggest using a pie chart for visualization.
+
+Audit: Identify issues and provide insights into:
+- Technical Aspects: Evaluate issues such as load times and broken links.
+- SEO Performance: Review factors like keywords, backlinks, and meta tags.
+- Accessibility: Assess aspects such as alt text usage and keyboard navigation.
+
+Suggestions: Provide actionable recommendations for improving website performance, SEO, and user experience.
+
+Visualizations: Include a \visualizations array with the following format:
+Each visualization should specify chartType (e.g., line_chart, bar_chart, pie_chart).
+Include data with:
+- labels (categories or time intervals).
+- datasets, where each dataset includes:
+  - A label for the metric it represents.
+  - An array of data points.
+  - Styling options like borderColor and backgroundColor.
+
+Please return output in JSON format with the following structure, ensuring that the names of the fields are consistent as specified:
+
+{
+    "Summary": "Summary as mentioned above",
+    "Analysis": {
+        "Traffic": {
+            "Description": "Description for traffic analysis",
+            "Traffic_Visualization": {
+                "chartType": "bar_chart",
+                "data": {
+                    "labels": ["Category1", "Category2", "Category3"],
+                    "datasets": [{
+                        "label": "Traffic Sources",
+                        "data": [values],
+                        "borderColor": ["#FF6384"],
+                        "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56"]
+                    }]
+                }
+            }
+        },
+        "User Behavior": {
+            "Description": "Description for user behavior analysis",
+            "Behavior_Visualization": {
+                "chartType": "line_chart",
+                "data": {
+                    "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+                    "datasets": [{
+                        "label": "Session Duration",
+                        "data": [2, 2.5, 3.2, 2.8, 3.5],
+                        "borderColor": ["#4BC0C0"],
+                        "backgroundColor": ["#FF6384"]
+                    }]
+                }
+            }
+        },
+        "Engagement": {
+            "Description": "Description for engagement analysis",
+            "Engagement_Visualization": {
+                "chartType": "pie_chart",
+                "data": {
+                    "labels": ["Click-Through Rate", "Conversion Rate", "Interaction Rate"],
+                    "datasets": [{
+                        "label": "Engagement Metrics",
+                        "data": [5, 3, 7],
+                        "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56"]
+                    }]
+                }
+            }
+        }
+    },
+    "Audit": {
+        "Technical Aspects": "Technical evaluation details",
+        "SEO Performance": "SEO evaluation details",
+        "Accessibility": "Accessibility evaluation details"
+    },
+    "Suggestions": "Suggestions for improving website performance, SEO, and user experience",
+    "Visualization": [
+        {
+            "chartType": "bar_chart",
+            "data": {
+                "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+                "datasets": [{
+                    "label": "Traffic Sources",
+                    "data": [1200, 1390, 1420, 1520, 1680],
+                    "borderColor": ["#FF6384"],
+                    "backgroundColor": ["#FF6384"]
+                }]
+            }
+        },
+        {
+            "chartType": "line_chart",
+            "data": {
+                "labels": ["Page Views", "Unique Visitors"],
+                "datasets": [{
+                    "label": "Page Views",
+                    "data": [4500, 4700, 4900, 5100, 5300],
+                    "borderColor": ["#36A2EB"],
+                    "backgroundColor": ["#36A2EB"]
+                }, {
+                    "label": "Unique Visitors",
+                    "data": [1500, 1550, 1600, 1650, 1700],
+                    "borderColor": ["#FFCE56"],
+                    "backgroundColor": ["#FFCE56"]
+                }]
+            }
+        },
+        {
+            "chartType": "pie_chart",
+            "data": {
+                "labels": ["Registrations", "Purchases", "Interactions"],
+                "datasets": [{
+                    "label": "User Engagements",
+                    "data": [300, 450, 350],
+                    "backgroundColor": ["#9966FF", "#4BC0C0", "#FF9F40"]
+                }]
+            }
+        }
+    ]
+}
+    eveything provide only in the json nothing outside the json.
+`;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: gptModel,
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant. Summarize and provide insights based on the provided data.",
+                    content: "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
                 },
                 {
                     role: "user",
                     content: prompt,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
@@ -262,7 +388,7 @@ const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, vo
     var _a, _b, _c, _d;
     try {
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
-            model: "gpt-3.5-turbo",
+            model: gptModel,
             messages: [
                 {
                     role: "system",
@@ -270,10 +396,9 @@ const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, vo
                 },
                 {
                     role: "user",
-                    content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis.`,
+                    content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis. Please give the answer in markdown format`,
                 },
             ],
-            max_tokens: 3000,
         }, {
             headers: {
                 Authorization: `Bearer ${openAIApiKey}`,
