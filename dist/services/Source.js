@@ -60,17 +60,17 @@ dotenv_1.default.config();
 function getContentThroughUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { data: html } = yield axios_1.default.get(url);
+            const { data: html } = yield axios_1.default.get(url, { timeout: 10000 });
             if (!html) {
                 throw new Error("No HTML content returned");
             }
             const $ = cheerio.load(html);
-            $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement").remove();
+            $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link").remove();
             const bodyText = $("p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote")
                 .map((_, element) => $(element).text().trim())
                 .get()
                 .join(" ");
-            return bodyText;
+            return bodyText.length > 5000 ? bodyText.substring(0, 5000) : bodyText;
         }
         catch (error) {
             console.error("Error fetching content:", error.message);

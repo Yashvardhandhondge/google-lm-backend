@@ -25,27 +25,26 @@ dotenv.config();
 
 export async function getContentThroughUrl(url: string): Promise<string> {
     try {
-        const { data: html } = await axios.get(url);
+        const { data: html } = await axios.get(url, { timeout: 10000 });
         
         if (!html) {
             throw new Error("No HTML content returned");
         }
 
         const $ = cheerio.load(html);
-        $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement").remove();
+        $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link").remove();
 
         const bodyText = $("p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote")
             .map((_, element) => $(element).text().trim())
             .get()
             .join(" ");
 
-        return bodyText;
+        return bodyText.length > 5000 ? bodyText.substring(0, 5000): bodyText;
     } catch (error: any) {
         console.error("Error fetching content:", error.message);
         return "Failed to fetch content.";
     }
 }
-
 
 export async function summarizePDFFile(
     file: Express.Multer.File,
