@@ -6,6 +6,11 @@ import { v4 as uuidv4 } from "uuid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../config/firebase";
 import MarkdownIt from "markdown-it";
+import fs from "fs";
+import path from "path";
+import mammoth from "mammoth";
+import xlsx from "xlsx";
+import mime from "mime-types";
 
 const md = new MarkdownIt();
 const gptModel = "gpt-4-turbo";
@@ -20,13 +25,21 @@ dotenv.config();
 
 export async function getContentThroughUrl(url: string): Promise<string> {
     try {
-        const { data: html } = await axios.get(url);
+        const { data: html } = await axios.get(url, { timeout: 10000 });
+        
+        if (!html) {
+            throw new Error("No HTML content returned");
+        }
+
         const $ = cheerio.load(html);
-        const bodyText = $("p, h1, h2, h3, span, li")
+        $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link").remove();
+
+        const bodyText = $("p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote")
             .map((_, element) => $(element).text().trim())
             .get()
             .join(" ");
-        return bodyText;
+
+        return bodyText.length > 5000 ? bodyText.substring(0, 5000): bodyText;
     } catch (error: any) {
         console.error("Error fetching content:", error.message);
         return "Failed to fetch content.";
@@ -159,18 +172,60 @@ export const uploadFiles = async (file: Express.Multer.File) => {
     return fileUrl;
 };
 
-export async function extractTextFromFile(
-    file: Express.Multer.File,
-    openAIApiKey: string
-): Promise<string> {
+export async function extractContent(file: Express.Multer.File): Promise<string> {
+    
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    const mimeType = mime.lookup(file.originalname);
+
     try {
-        const data = await pdfParse(file.buffer);
-        return data.text;
+        
+        if (mimeType === "application/pdf" || fileExtension === ".pdf") {
+            const data = await pdfParse(file.buffer);
+            return data.text;
+        } else if (
+            mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+            fileExtension === ".docx"
+        ) {
+            const result = await mammoth.extractRawText({ buffer: file.buffer });
+            return result.value;
+        } else if (
+            mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+            fileExtension === ".xlsx" ||
+            mimeType === "application/vnd.ms-excel" ||
+            fileExtension === ".xls"
+        ) {
+            const buffer = file.buffer ? file.buffer : fs.readFileSync(file.path);
+            const workbook = xlsx.read(buffer, { type: 'buffer' });
+            let content = "";
+            workbook.SheetNames.forEach((sheetName) => {
+                const sheet = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                content += sheet.map((row) => (Array.isArray(row) ? row.join("\t") : "")).join("\n");
+            });
+            return content;
+        } else if (mimeType === "text/plain" || fileExtension === ".txt") {
+            const content = file.buffer ? file.buffer.toString('utf-8') : fs.readFileSync(file.path, 'utf-8');
+            return content;
+        } else {
+            throw new Error(`Unsupported file type: ${fileExtension} or ${mimeType}`);
+        }
     } catch (error) {
-        console.error("Error extracting text from PDF:", error);
-        throw error;
+        console.error("Error extracting content:", error);
+        throw new Error("Failed to extract file content.");
     }
 }
+
+// export async function extractTextFromFile(
+//     file: Express.Multer.File,
+//     openAIApiKey: string
+// ): Promise<string> {
+//     try {
+//         const data = await pdfParse(file.buffer);
+//         return data.text;
+//     } catch (error) {
+//         console.error("Error extracting text from PDF:", error);
+//         throw error;
+//     }
+// }
 
 export const respondToConversation = async ({
     context,
@@ -418,7 +473,14 @@ export const pullDataAnalysis = async (
                     },
                     {
                         role: "user",
-                        content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis. Please give the answer in markdown format`,
+                        content: `You are a data analysis assistant. I will provide you with raw Google Analytics data, including key metrics such as page views, user counts, session durations, bounce rates, top pages, and traffic sources. Your task is to:
+Summarize the performance of the website based on this data.
+Highlight key trends, patterns, or anomalies observed.
+Suggest actionable insights or strategies to improve website performance.
+Include any potential areas of concern and how they can be addressed.
+Please respond in a structured format, including the summary, observations, and recommendations clearly.
+Please give the answer in markdown format,
+`,
                     },
                 ],
             },

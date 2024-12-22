@@ -258,7 +258,7 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     message: "File upload failed. Please upload a smaller file or try again.",
                 });
             }
-            const content = yield (0, Source_1.extractTextFromFile)(file, user.openAikey);
+            const content = yield (0, Source_1.extractContent)(file);
             const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url: fileUrl,

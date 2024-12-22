@@ -40,7 +40,7 @@ exports.getContentThroughUrl = getContentThroughUrl;
 exports.summarizePDFFile = summarizePDFFile;
 exports.summarizeContent = summarizeContent;
 exports.suggetionChat = suggetionChat;
-exports.extractTextFromFile = extractTextFromFile;
+exports.extractContent = extractContent;
 const axios_1 = __importDefault(require("axios"));
 const cheerio = __importStar(require("cheerio"));
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -49,19 +49,28 @@ const uuid_1 = require("uuid");
 const storage_1 = require("firebase/storage");
 const firebase_1 = require("../config/firebase");
 const markdown_it_1 = __importDefault(require("markdown-it"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+const mammoth_1 = __importDefault(require("mammoth"));
+const xlsx_1 = __importDefault(require("xlsx"));
+const mime_types_1 = __importDefault(require("mime-types"));
 const md = new markdown_it_1.default();
 const gptModel = "gpt-4-turbo";
 dotenv_1.default.config();
 function getContentThroughUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { data: html } = yield axios_1.default.get(url);
+            const { data: html } = yield axios_1.default.get(url, { timeout: 10000 });
+            if (!html) {
+                throw new Error("No HTML content returned");
+            }
             const $ = cheerio.load(html);
-            const bodyText = $("p, h1, h2, h3, span, li")
+            $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link").remove();
+            const bodyText = $("p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote")
                 .map((_, element) => $(element).text().trim())
                 .get()
                 .join(" ");
-            return bodyText;
+            return bodyText.length > 5000 ? bodyText.substring(0, 5000) : bodyText;
         }
         catch (error) {
             console.error("Error fetching content:", error.message);
@@ -170,15 +179,44 @@ const uploadFiles = (file) => __awaiter(void 0, void 0, void 0, function* () {
     return fileUrl;
 });
 exports.uploadFiles = uploadFiles;
-function extractTextFromFile(file, openAIApiKey) {
+function extractContent(file) {
     return __awaiter(this, void 0, void 0, function* () {
+        const fileExtension = path_1.default.extname(file.originalname).toLowerCase();
+        const mimeType = mime_types_1.default.lookup(file.originalname);
         try {
-            const data = yield (0, pdf_parse_1.default)(file.buffer);
-            return data.text;
+            if (mimeType === "application/pdf" || fileExtension === ".pdf") {
+                const data = yield (0, pdf_parse_1.default)(file.buffer);
+                return data.text;
+            }
+            else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                fileExtension === ".docx") {
+                const result = yield mammoth_1.default.extractRawText({ buffer: file.buffer });
+                return result.value;
+            }
+            else if (mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                fileExtension === ".xlsx" ||
+                mimeType === "application/vnd.ms-excel" ||
+                fileExtension === ".xls") {
+                const buffer = file.buffer ? file.buffer : fs_1.default.readFileSync(file.path);
+                const workbook = xlsx_1.default.read(buffer, { type: 'buffer' });
+                let content = "";
+                workbook.SheetNames.forEach((sheetName) => {
+                    const sheet = xlsx_1.default.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                    content += sheet.map((row) => (Array.isArray(row) ? row.join("\t") : "")).join("\n");
+                });
+                return content;
+            }
+            else if (mimeType === "text/plain" || fileExtension === ".txt") {
+                const content = file.buffer ? file.buffer.toString('utf-8') : fs_1.default.readFileSync(file.path, 'utf-8');
+                return content;
+            }
+            else {
+                throw new Error(`Unsupported file type: ${fileExtension} or ${mimeType}`);
+            }
         }
         catch (error) {
-            console.error("Error extracting text from PDF:", error);
-            throw error;
+            console.error("Error extracting content:", error);
+            throw new Error("Failed to extract file content.");
         }
     });
 }
@@ -396,7 +434,14 @@ const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, vo
                 },
                 {
                     role: "user",
-                    content: `This is the data provided by google analytics please check there is headings which the metadataHeader of the data is provided. Please analyze the data which is in the metrics rows metricvalue and give the analysis. Please give the answer in markdown format`,
+                    content: `You are a data analysis assistant. I will provide you with raw Google Analytics data, including key metrics such as page views, user counts, session durations, bounce rates, top pages, and traffic sources. Your task is to:
+Summarize the performance of the website based on this data.
+Highlight key trends, patterns, or anomalies observed.
+Suggest actionable insights or strategies to improve website performance.
+Include any potential areas of concern and how they can be addressed.
+Please respond in a structured format, including the summary, observations, and recommendations clearly.
+Please give the answer in markdown format,
+`,
                 },
             ],
         }, {
