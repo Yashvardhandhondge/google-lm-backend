@@ -23,6 +23,20 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const googleapis_1 = require("googleapis");
 dotenv_1.default.config();
 const oauth2Client = new googleapis_1.google.auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_SECRET, process.env.REDIRECT_URI);
+const matricsArray = [
+    { name: "activeUsers" },
+    { name: "screenPageViews" },
+    { name: "eventCount" },
+    { name: "userEngagementDuration" },
+    { name: "sessions" },
+    { name: "newUsers" },
+    { name: "totalUsers" },
+    { name: "bounceRate" },
+    { name: "totalUsers" },
+    { name: "transactions" },
+    { name: "totalRevenue" },
+    { name: "itemListClickThroughRate" },
+];
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, clerkId } = req.body;
     try {
@@ -66,7 +80,7 @@ const saveOpenAikey = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
-            propertyId: user.propertyId === '' ? false : true
+            propertyId: user.propertyId === "" ? false : true,
         });
     }
     catch (error) {
@@ -197,6 +211,24 @@ const getAllNotes = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getAllNotes = getAllNotes;
+function splitContent(content, chunkSize = 10000) {
+    const chunks = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+        chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+function summarizeLargeContent(content, apiKey) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const chunks = splitContent(content);
+        let finalSummary = "";
+        for (const chunk of chunks) {
+            const summary = yield (0, Source_1.summarizeContent)(chunk, apiKey);
+            finalSummary += summary + "\n\n";
+        }
+        return finalSummary.trim();
+    });
+}
 const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { workspaceId } = req.params;
@@ -212,16 +244,26 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(410).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         if (uploadType === "file" && req.file) {
-            const fileUrl = yield (0, Source_1.uploadFiles)(file);
+            let fileUrl;
+            try {
+                fileUrl = yield (0, Source_1.uploadFiles)(file);
+            }
+            catch (error) {
+                return res.status(400).json({
+                    message: "File upload failed. Please upload a smaller file or try again.",
+                });
+            }
             const content = yield (0, Source_1.extractTextFromFile)(file, user.openAikey);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url: fileUrl,
                 summary,
-                name: req.file.originalname,
+                name: req.file.originalname.split(".").slice(0, -1).join("."),
                 uploadType,
             });
             yield newSource.save();
@@ -230,9 +272,8 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.status(200).json({ newSource, message: "Source Added" });
         }
         else if (uploadType === "url" && url) {
-            // If URL is provided, process it as usual
             const content = yield (0, Source_1.getContentThroughUrl)(url);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url,
                 summary,
@@ -280,7 +321,7 @@ const createConversation = (req, res) => __awaiter(void 0, void 0, void 0, funct
         return res.json({ message: "User not found" });
     }
     if (user.openAikey === "") {
-        return res.json({ message: "Please provide woking OpenAi key" });
+        return res.status(400).json({ message: "Please provide woking OpenAi key" });
     }
     if (context === "," || question === "")
         return res.status(404).json({ message: "Please provide some context" });
@@ -306,7 +347,7 @@ const createConversationOfSuggestion = (req, res) => __awaiter(void 0, void 0, v
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res.status(400).json({ message: "Please provide woking OpenAi key" });
         }
         const resp = yield (0, Source_1.suggetionChat)(question, user.openAikey);
         res.status(200).json({ message: resp });
@@ -417,13 +458,13 @@ const getAllAccounts = (req, res) => __awaiter(void 0, void 0, void 0, function*
             try {
                 const user = yield User_1.default.findOne({ clerkId });
                 if (!user) {
-                    return res.json({ message: "User not found" });
+                    return res.status(400).json({ message: "User not found" });
                 }
                 user.googleAnalytics = "";
                 user.propertyId = "";
                 user.googleRefreshToken = "";
                 yield user.save();
-                res.status(410).json({
+                res.status(400).json({
                     message: "Token expired, Link again Google Analytics..",
                 });
             }
@@ -490,8 +531,8 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
-        if (user.openAikey === '') {
-            return res.json({ message: 'Please provide OpenAI key' });
+        if (user.openAikey === "") {
+            return res.status(400).json({ message: "Please provide OpenAI key" });
         }
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -503,15 +544,7 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             property: propertyId,
             requestBody: {
                 dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: [
-                    { name: "activeUsers" },
-                    { name: "screenPageViews" },
-                    { name: "eventCount" },
-                    { name: "userEngagementDuration" },
-                    { name: "sessions" },
-                    { name: "newUsers" },
-                    { name: "totalUsers" },
-                ],
+                metrics: matricsArray,
                 dimensions: [{ name: "date" }],
                 returnPropertyQuota: true,
             },
@@ -596,7 +629,7 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
                 message: "Please select any analytics account from the home page.",
             });
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res.status(400).json({ message: "Please provide woking OpenAi key" });
         }
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -674,7 +707,7 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res.status(400).json({ message: "Please provide woking OpenAi key" });
         }
         const filteredNotes = workspace.notes.filter((note) => {
             const noteDate = new Date(note.createdAt);
@@ -691,7 +724,7 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             sources: sourcesContent,
             workspaceName: workspace.name,
             generateReportText,
-            openAIApiKey: user.openAikey
+            openAIApiKey: user.openAikey,
         });
         res.json({ summary });
     }
