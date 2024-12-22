@@ -220,18 +220,6 @@ function extractContent(file) {
         }
     });
 }
-// export async function extractTextFromFile(
-//     file: Express.Multer.File,
-//     openAIApiKey: string
-// ): Promise<string> {
-//     try {
-//         const data = await pdfParse(file.buffer);
-//         return data.text;
-//     } catch (error) {
-//         console.error("Error extracting text from PDF:", error);
-//         throw error;
-//     }
-// }
 const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ context, question, openAIApiKey, }) {
     var _b, _c, _d, _e;
     try {
