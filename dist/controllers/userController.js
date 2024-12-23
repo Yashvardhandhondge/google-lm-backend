@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
+exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.deleteWorkspace = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const Workspace_1 = __importDefault(require("../models/Workspace"));
 const Note_1 = __importDefault(require("../models/Note"));
@@ -167,6 +167,27 @@ const getWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.getWorkspace = getWorkspace;
+const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { clerkId, workspaceId } = req.params;
+    try {
+        const user = yield User_1.default.findOne({ clerkId });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const workspace = yield Workspace_1.default.findById(workspaceId);
+        if (!workspace) {
+            return res.status(404).json({ message: "Workspace not found" });
+        }
+        user.workspaces = user.workspaces.filter((id) => id.toString() !== workspaceId);
+        yield user.save();
+        yield Workspace_1.default.findByIdAndDelete(workspaceId);
+        res.status(200).json({ message: "Workspace deleted successfully" });
+    }
+    catch (err) {
+        res.status(500).json({ message: "Error while deleting workspace" });
+    }
+});
+exports.deleteWorkspace = deleteWorkspace;
 const createNewNote = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { workspaceId } = req.params;
     const { heading, content, type } = req.body;
