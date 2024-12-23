@@ -34,7 +34,7 @@ const matricsArray = [
     { name: "totalUsers" },
     { name: "bounceRate" },
     { name: "transactions" },
-    { name: "totalRevenue" },
+    // { name: "totalRevenue" },
     { name: "itemListClickThroughRate" },
 ];
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
