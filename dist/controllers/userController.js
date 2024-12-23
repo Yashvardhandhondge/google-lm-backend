@@ -12,10 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
+exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.deleteWorkspace = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const Workspace_1 = __importDefault(require("../models/Workspace"));
 const Note_1 = __importDefault(require("../models/Note"));
+const mongoose_1 = __importDefault(require("mongoose"));
 const Source_1 = require("../services/Source");
 const Source_2 = __importDefault(require("../models/Source"));
 const axios_1 = __importDefault(require("axios"));
@@ -211,6 +212,86 @@ const getAllNotes = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getAllNotes = getAllNotes;
+const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { clerkId, workspaceId } = req.params;
+    try {
+        console.log('Deleting workspace', workspaceId, 'for user', clerkId);
+        // Start a MongoDB session for transaction
+        const session = yield mongoose_1.default.startSession();
+        session.startTransaction();
+        try {
+            // Find and verify user
+            const user = yield User_1.default.findOne({ clerkId }).session(session);
+            if (!user) {
+                yield session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "User not found" });
+            }
+            // Find and verify workspace with all populated data
+            const workspace = yield Workspace_1.default.findById(workspaceId)
+                .populate('notes')
+                .populate('sources')
+                .session(session);
+            if (!workspace) {
+                yield session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "Workspace not found" });
+            }
+            // Remove workspace reference from user
+            user.workspaces = user.workspaces.filter((id) => id.toString() !== workspaceId);
+            yield user.save({ session });
+            // Delete all associated notes
+            if (workspace.notes && workspace.notes.length > 0) {
+                // Delete each note individually to ensure proper cleanup
+                const noteIds = workspace.notes.map(note => note._id);
+                yield Note_1.default.deleteMany({
+                    _id: { $in: noteIds }
+                }).session(session);
+            }
+            // Delete all associated sources
+            if (workspace.sources && workspace.sources.length > 0) {
+                // Delete each source individually to ensure proper cleanup
+                const sourceIds = workspace.sources.map(source => source._id);
+                yield Source_2.default.deleteMany({
+                    _id: { $in: sourceIds }
+                }).session(session);
+            }
+            // Delete any conversations or other related data
+            // Add more cleanup here if you have other related collections
+            // Finally delete the workspace itself
+            yield Workspace_1.default.findByIdAndDelete(workspaceId).session(session);
+            // Commit the transaction
+            yield session.commitTransaction();
+            session.endSession();
+            // Log successful deletion
+            console.log(`Successfully deleted workspace ${workspaceId} and all associated data`);
+            res.status(200).json({
+                message: "Workspace and all associated data deleted successfully",
+                deletedWorkspaceId: workspaceId,
+                deletedData: {
+                    notesCount: ((_a = workspace.notes) === null || _a === void 0 ? void 0 : _a.length) || 0,
+                    sourcesCount: ((_b = workspace.sources) === null || _b === void 0 ? void 0 : _b.length) || 0
+                }
+            });
+        }
+        catch (error) {
+            // If any error occurs during the transaction, abort it
+            yield session.abortTransaction();
+            session.endSession();
+            console.error('Transaction error:', error);
+            throw error;
+        }
+    }
+    catch (err) {
+        console.error('Error in deleteWorkspace:', err);
+        res.status(500).json({
+            message: "Error while deleting workspace and associated data",
+            error: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined
+        });
+    }
+});
+exports.deleteWorkspace = deleteWorkspace;
 function splitContent(content, chunkSize = 10000) {
     const chunks = [];
     for (let i = 0; i < content.length; i += chunkSize) {

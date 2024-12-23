@@ -175,6 +175,7 @@ export const getWorkspace = async (req: Request, res: Response) => {
     }
 };
 
+
 export const createNewNote = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
     const { heading, content, type } = req.body;
@@ -224,6 +225,98 @@ export const getAllNotes = async (req: Request, res: Response) => {
     }
 };
 
+export const deleteWorkspace = async (req: Request, res: Response) => {
+    const { clerkId, workspaceId } = req.params;
+
+    try {
+        console.log('Deleting workspace', workspaceId, 'for user', clerkId);
+        // Start a MongoDB session for transaction
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+            // Find and verify user
+            const user = await User.findOne({ clerkId }).session(session);
+            if (!user) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            // Find and verify workspace with all populated data
+            const workspace = await Workspace.findById(workspaceId)
+                .populate('notes')
+                .populate('sources')
+                .session(session);
+                
+            if (!workspace) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "Workspace not found" });
+            }
+
+            // Remove workspace reference from user
+            user.workspaces = user.workspaces.filter(
+                (id) => id.toString() !== workspaceId
+            );
+            await user.save({ session });
+
+            // Delete all associated notes
+            if (workspace.notes && workspace.notes.length > 0) {
+                // Delete each note individually to ensure proper cleanup
+                const noteIds = workspace.notes.map(note => note._id);
+                await Note.deleteMany({
+                    _id: { $in: noteIds }
+                }).session(session);
+            }
+
+            // Delete all associated sources
+            if (workspace.sources && workspace.sources.length > 0) {
+                // Delete each source individually to ensure proper cleanup
+                const sourceIds = workspace.sources.map(source => source._id);
+                await Source.deleteMany({
+                    _id: { $in: sourceIds }
+                }).session(session);
+            }
+
+            // Delete any conversations or other related data
+            // Add more cleanup here if you have other related collections
+
+            // Finally delete the workspace itself
+            await Workspace.findByIdAndDelete(workspaceId).session(session);
+
+            // Commit the transaction
+            await session.commitTransaction();
+            session.endSession();
+
+            // Log successful deletion
+            console.log(`Successfully deleted workspace ${workspaceId} and all associated data`);
+
+            res.status(200).json({ 
+                message: "Workspace and all associated data deleted successfully",
+                deletedWorkspaceId: workspaceId,
+                deletedData: {
+                    notesCount: workspace.notes?.length || 0,
+                    sourcesCount: workspace.sources?.length || 0
+                }
+            });
+
+        } catch (error) {
+            // If any error occurs during the transaction, abort it
+            await session.abortTransaction();
+            session.endSession();
+            console.error('Transaction error:', error);
+            throw error;
+        }
+
+    } catch (err) {
+        console.error('Error in deleteWorkspace:', err);
+        res.status(500).json({ 
+            message: "Error while deleting workspace and associated data",
+            error: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined
+        });
+    }
+};
 function splitContent(content: string, chunkSize: number = 10000): string[] {
     const chunks: string[] = [];
     for (let i = 0; i < content.length; i += chunkSize) {
