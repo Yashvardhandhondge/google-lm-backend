@@ -33,7 +33,6 @@ const matricsArray = [
     { name: "newUsers" },
     { name: "totalUsers" },
     { name: "bounceRate" },
-    { name: "totalUsers" },
     { name: "transactions" },
     { name: "totalRevenue" },
     { name: "itemListClickThroughRate" },
