@@ -10,7 +10,7 @@ import {
     summarizeWorkspace,
     pullDataAnalysis,
     suggetionChat,
-    summarizePDFFile,
+    // summarizePDFFile,
     extractContent,
     getContentThroughUrl
 } from "../services/Source";
@@ -27,19 +27,19 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.REDIRECT_URI
 );
 
-const matricsArray = [
-    { name: "activeUsers" },
-    { name: "screenPageViews" },
-    { name: "eventCount" },
-    { name: "userEngagementDuration" },
-    { name: "sessions" },
-    { name: "newUsers" },
-    { name: "totalUsers" },
-    { name: "bounceRate" },
-    { name: "transactions" },
-    // { name: "totalRevenue" },
-    { name: "itemListClickThroughRate" },
-]
+// const matricsArray = [
+//     { name: "activeUsers" },
+//     { name: "screenPageViews" },
+//     { name: "eventCount" },
+//     { name: "userEngagementDuration" },
+//     { name: "sessions" },
+//     { name: "newUsers" },
+//     { name: "totalUsers" },
+//     { name: "bounceRate" },
+//     { name: "transactions" },
+//     // { name: "totalRevenue" },
+//     { name: "itemListClickThroughRate" },
+// ]
 
 export const createUser = async (req: Request, res: Response) => {
     const { email, clerkId } = req.body;
@@ -154,6 +154,7 @@ export const getAllWorkspaces = async (req: Request, res: Response) => {
         res.status(200).json({
             workspaces: user.workspaces,
             message: "Workspace Fetched",
+            propertyNames: user.propertyName,
         });
     } catch (err) {
         res.status(500).json({ message: "Error while fetching workspaces" });
@@ -662,9 +663,8 @@ export const getGaProperties = async (req: Request, res: Response) => {
 };
 
 export const getGaReport = async (req: Request, res: Response) => {
-    const { clerkId, propertyId } = req.query;
+    const { clerkId, propertyId, displayName } = req.query;
 
-    // Validate required parameters
     if (!clerkId || !propertyId) {
         return res
             .status(400)
@@ -677,67 +677,68 @@ export const getGaReport = async (req: Request, res: Response) => {
             return res.status(404).json({ message: "User not found." });
         }
 
-        if (user.openAikey === "") {
-            return res.status(400).json({ message: "Please provide OpenAI key" });
-        }
+        // if (user.openAikey === "") {
+        //     return res.status(400).json({ message: "Please provide OpenAI key" });
+        // }
 
-        oauth2Client.setCredentials({
-            access_token: user.googleAnalytics,
-            refresh_token: user.googleRefreshToken,
-        });
+        // oauth2Client.setCredentials({
+        //     access_token: user.googleAnalytics,
+        //     refresh_token: user.googleRefreshToken,
+        // });
 
-        const analyticsData = google.analyticsdata("v1beta");
-        const reportResponse = await analyticsData.properties.runReport({
-            auth: oauth2Client,
-            property: propertyId as string,
-            requestBody: {
-                dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: matricsArray,
-                dimensions: [{ name: "date" }],
-                returnPropertyQuota: true,
-            },
-        });
+        // const analyticsData = google.analyticsdata("v1beta");
+        // const reportResponse = await analyticsData.properties.runReport({
+        //     auth: oauth2Client,
+        //     property: propertyId as string,
+        //     requestBody: {
+        //         dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+        //         metrics: matricsArray,
+        //         dimensions: [{ name: "date" }],
+        //         returnPropertyQuota: true,
+        //     },
+        // });
 
-        const analysis = await pullDataAnalysis(
-            reportResponse.data,
-            user.openAikey
-        );
+        // const analysis = await pullDataAnalysis(
+        //     reportResponse.data,
+        //     user.openAikey
+        // );
 
-        const newNote = new Note({
-            heading: "Google Analytics",
-            content: analysis,
-            type: "Analytics",
-        });
-        await newNote.save();
+        // const newNote = new Note({
+        //     heading: "Google Analytics",
+        //     content: analysis,
+        //     type: "Analytics",
+        // });
+        // await newNote.save();
 
-        let workspaceId: mongoose.Types.ObjectId;
+        // let workspaceId: mongoose.Types.ObjectId;
 
-        if (user.workspaces.length > 0) {
-            workspaceId = user.workspaces[0];
-            const workspace = await Workspace.findOne({ _id: workspaceId });
-            workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
-            await workspace?.save();
-        } else {
-            const newWorkspace = new Workspace({
-                name: "New Workspace",
-                notes: [newNote._id],
-            });
-            await newWorkspace.save();
+        // if (user.workspaces.length > 0) {
+        //     workspaceId = user.workspaces[0];
+        //     const workspace = await Workspace.findOne({ _id: workspaceId });
+        //     workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
+        //     await workspace?.save();
+        // } else {
+        //     const newWorkspace = new Workspace({
+        //         name: "New Workspace",
+        //         notes: [newNote._id],
+        //     });
+        //     await newWorkspace.save();
 
-            user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
-        }
+        //     user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
+        // }
 
         user.propertyId = propertyId as string;
+        user.propertyName = displayName as string;
         await user.save();
 
-        const userWorkspaces = await User.findOne({ clerkId })
-            .populate({
-                path: "workspaces",
-                select: "-notes -source",
-            })
-            .lean();
+        // const userWorkspaces = await User.findOne({ clerkId })
+        //     .populate({
+        //         path: "workspaces",
+        //         select: "-notes -source",
+        //     })
+        //     .lean();
 
-        res.json({ workspace: userWorkspaces?.workspaces, propertyId: true });
+        res.json({ propertyId: true, propertyName: displayName });
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
 
@@ -772,7 +773,7 @@ export const getGaReport = async (req: Request, res: Response) => {
 };
 
 export const getGaReportForWorkspace = async (req: Request, res: Response) => {
-    const { clerkId, startDate, endDate, metrics } = req.body;
+    const { clerkId, startDate, endDate, metrics, workspaceId } = req.body;
 
     if (
         !clerkId ||
@@ -823,7 +824,17 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
             user.openAikey
         );
 
-        res.json(analysis);
+        const newNote = new Note({
+            heading: `Analytics for ${startDate} to ${endDate}`,
+            content: analysis,
+            type: 'Analytics'
+        });
+        const workspace = await Workspace.findById(workspaceId);
+        await newNote.save();
+        workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
+        await workspace?.save();
+
+        res.json({analysis, newNote});
     } catch (error: any) {
         console.error("Error fetching GA4 analytics report:", error);
 
@@ -864,7 +875,6 @@ export const generateReport = async (req: Request, res: Response) => {
     const { workspaceId } = req.params;
     const { startDate, endDate, generateReportText, clerkId } = req.body;
 
-    // Validate date inputs
     if (!startDate || !endDate) {
         return res
             .status(400)
@@ -923,7 +933,16 @@ export const generateReport = async (req: Request, res: Response) => {
             openAIApiKey: user.openAikey,
         });
 
-        res.json({ summary });
+        const newNote = new Note({
+            heading: `Report for ${startDate} to ${endDate}`,
+            content: summary,
+            type: 'Report'
+        });
+        await newNote.save();
+        workspace.notes.push(newNote._id as mongoose.Types.ObjectId);
+        await workspace.save();
+
+        res.json({ summary, newNote });
     } catch (error) {
         console.error("Error generating report:", error);
         res.status(500).json({

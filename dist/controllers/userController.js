@@ -24,19 +24,19 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const googleapis_1 = require("googleapis");
 dotenv_1.default.config();
 const oauth2Client = new googleapis_1.google.auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_SECRET, process.env.REDIRECT_URI);
-const matricsArray = [
-    { name: "activeUsers" },
-    { name: "screenPageViews" },
-    { name: "eventCount" },
-    { name: "userEngagementDuration" },
-    { name: "sessions" },
-    { name: "newUsers" },
-    { name: "totalUsers" },
-    { name: "bounceRate" },
-    { name: "transactions" },
-    // { name: "totalRevenue" },
-    { name: "itemListClickThroughRate" },
-];
+// const matricsArray = [
+//     { name: "activeUsers" },
+//     { name: "screenPageViews" },
+//     { name: "eventCount" },
+//     { name: "userEngagementDuration" },
+//     { name: "sessions" },
+//     { name: "newUsers" },
+//     { name: "totalUsers" },
+//     { name: "bounceRate" },
+//     { name: "transactions" },
+//     // { name: "totalRevenue" },
+//     { name: "itemListClickThroughRate" },
+// ]
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, clerkId } = req.body;
     try {
@@ -146,6 +146,7 @@ const getAllWorkspaces = (req, res) => __awaiter(void 0, void 0, void 0, functio
         res.status(200).json({
             workspaces: user.workspaces,
             message: "Workspace Fetched",
+            propertyNames: user.propertyName,
         });
     }
     catch (err) {
@@ -599,8 +600,7 @@ const getGaProperties = (req, res) => __awaiter(void 0, void 0, void 0, function
 exports.getGaProperties = getGaProperties;
 const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
-    const { clerkId, propertyId } = req.query;
-    // Validate required parameters
+    const { clerkId, propertyId, displayName } = req.query;
     if (!clerkId || !propertyId) {
         return res
             .status(400)
@@ -611,55 +611,58 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
-        if (user.openAikey === "") {
-            return res.status(400).json({ message: "Please provide OpenAI key" });
-        }
-        oauth2Client.setCredentials({
-            access_token: user.googleAnalytics,
-            refresh_token: user.googleRefreshToken,
-        });
-        const analyticsData = googleapis_1.google.analyticsdata("v1beta");
-        const reportResponse = yield analyticsData.properties.runReport({
-            auth: oauth2Client,
-            property: propertyId,
-            requestBody: {
-                dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: matricsArray,
-                dimensions: [{ name: "date" }],
-                returnPropertyQuota: true,
-            },
-        });
-        const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey);
-        const newNote = new Note_1.default({
-            heading: "Google Analytics",
-            content: analysis,
-            type: "Analytics",
-        });
-        yield newNote.save();
-        let workspaceId;
-        if (user.workspaces.length > 0) {
-            workspaceId = user.workspaces[0];
-            const workspace = yield Workspace_1.default.findOne({ _id: workspaceId });
-            workspace === null || workspace === void 0 ? void 0 : workspace.notes.push(newNote._id);
-            yield (workspace === null || workspace === void 0 ? void 0 : workspace.save());
-        }
-        else {
-            const newWorkspace = new Workspace_1.default({
-                name: "New Workspace",
-                notes: [newNote._id],
-            });
-            yield newWorkspace.save();
-            user.workspaces.push(newWorkspace._id);
-        }
+        // if (user.openAikey === "") {
+        //     return res.status(400).json({ message: "Please provide OpenAI key" });
+        // }
+        // oauth2Client.setCredentials({
+        //     access_token: user.googleAnalytics,
+        //     refresh_token: user.googleRefreshToken,
+        // });
+        // const analyticsData = google.analyticsdata("v1beta");
+        // const reportResponse = await analyticsData.properties.runReport({
+        //     auth: oauth2Client,
+        //     property: propertyId as string,
+        //     requestBody: {
+        //         dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+        //         metrics: matricsArray,
+        //         dimensions: [{ name: "date" }],
+        //         returnPropertyQuota: true,
+        //     },
+        // });
+        // const analysis = await pullDataAnalysis(
+        //     reportResponse.data,
+        //     user.openAikey
+        // );
+        // const newNote = new Note({
+        //     heading: "Google Analytics",
+        //     content: analysis,
+        //     type: "Analytics",
+        // });
+        // await newNote.save();
+        // let workspaceId: mongoose.Types.ObjectId;
+        // if (user.workspaces.length > 0) {
+        //     workspaceId = user.workspaces[0];
+        //     const workspace = await Workspace.findOne({ _id: workspaceId });
+        //     workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
+        //     await workspace?.save();
+        // } else {
+        //     const newWorkspace = new Workspace({
+        //         name: "New Workspace",
+        //         notes: [newNote._id],
+        //     });
+        //     await newWorkspace.save();
+        //     user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
+        // }
         user.propertyId = propertyId;
+        user.propertyName = displayName;
         yield user.save();
-        const userWorkspaces = yield User_1.default.findOne({ clerkId })
-            .populate({
-            path: "workspaces",
-            select: "-notes -source",
-        })
-            .lean();
-        res.json({ workspace: userWorkspaces === null || userWorkspaces === void 0 ? void 0 : userWorkspaces.workspaces, propertyId: true });
+        // const userWorkspaces = await User.findOne({ clerkId })
+        //     .populate({
+        //         path: "workspaces",
+        //         select: "-notes -source",
+        //     })
+        //     .lean();
+        res.json({ propertyId: true, propertyName: displayName });
     }
     catch (error) {
         console.error("Error fetching GA4 analytics report:", error);
@@ -690,7 +693,7 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getGaReport = getGaReport;
 const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
-    const { clerkId, startDate, endDate, metrics } = req.body;
+    const { clerkId, startDate, endDate, metrics, workspaceId } = req.body;
     if (!clerkId ||
         !startDate ||
         !endDate ||
@@ -727,7 +730,16 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
             },
         });
         const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey);
-        res.json(analysis);
+        const newNote = new Note_1.default({
+            heading: `Analytics for ${startDate} to ${endDate}`,
+            content: analysis,
+            type: 'Analytics'
+        });
+        const workspace = yield Workspace_1.default.findById(workspaceId);
+        yield newNote.save();
+        workspace === null || workspace === void 0 ? void 0 : workspace.notes.push(newNote._id);
+        yield (workspace === null || workspace === void 0 ? void 0 : workspace.save());
+        res.json({ analysis, newNote });
     }
     catch (error) {
         console.error("Error fetching GA4 analytics report:", error);
@@ -759,7 +771,6 @@ exports.getGaReportForWorkspace = getGaReportForWorkspace;
 const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { workspaceId } = req.params;
     const { startDate, endDate, generateReportText, clerkId } = req.body;
-    // Validate date inputs
     if (!startDate || !endDate) {
         return res
             .status(400)
@@ -806,7 +817,15 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             generateReportText,
             openAIApiKey: user.openAikey,
         });
-        res.json({ summary });
+        const newNote = new Note_1.default({
+            heading: `Report for ${startDate} to ${endDate}`,
+            content: summary,
+            type: 'Report'
+        });
+        yield newNote.save();
+        workspace.notes.push(newNote._id);
+        yield workspace.save();
+        res.json({ summary, newNote });
     }
     catch (error) {
         console.error("Error generating report:", error);
