@@ -6,6 +6,7 @@ export interface IUser extends Document {
     createdAt: Date;
     openAikey: string;
     propertyId: string;
+    propertyName: string;
     googleAnalytics: string;
     googleRefreshToken: string;
     workspaces: mongoose.Types.ObjectId[];
@@ -22,6 +23,10 @@ const userSchema: Schema = new Schema({
         { type: mongoose.Schema.Types.ObjectId, ref: "Workspace", default: [] },
     ],
     propertyId: {
+        type: String,
+        default: "",
+    },
+    propertyName: {
         type: String,
         default: "",
     },

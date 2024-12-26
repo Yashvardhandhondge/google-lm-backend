@@ -402,7 +402,7 @@ Please return output in JSON format with the following structure, ensuring that 
         }
     ]
 }
-    eveything provide only in the json nothing outside the json.
+    eveything provide only in the json nothing outside the json. and please provide the written content in at least 1500 words.
 `;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
             model: gptModel,

@@ -38,6 +38,10 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         default: "",
     },
+    propertyName: {
+        type: String,
+        default: "",
+    },
 });
 const User = mongoose_1.default.model("User", userSchema);
 exports.default = User;
