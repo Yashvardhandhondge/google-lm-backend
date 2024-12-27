@@ -188,26 +188,34 @@ function extractContent(file) {
                 const data = yield (0, pdf_parse_1.default)(file.buffer);
                 return data.text;
             }
-            else if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+            else if (mimeType ===
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
                 fileExtension === ".docx") {
                 const result = yield mammoth_1.default.extractRawText({ buffer: file.buffer });
                 return result.value;
             }
-            else if (mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+            else if (mimeType ===
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
                 fileExtension === ".xlsx" ||
                 mimeType === "application/vnd.ms-excel" ||
                 fileExtension === ".xls") {
                 const buffer = file.buffer ? file.buffer : fs_1.default.readFileSync(file.path);
-                const workbook = xlsx_1.default.read(buffer, { type: 'buffer' });
+                const workbook = xlsx_1.default.read(buffer, { type: "buffer" });
                 let content = "";
                 workbook.SheetNames.forEach((sheetName) => {
-                    const sheet = xlsx_1.default.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-                    content += sheet.map((row) => (Array.isArray(row) ? row.join("\t") : "")).join("\n");
+                    const sheet = xlsx_1.default.utils.sheet_to_json(workbook.Sheets[sheetName], {
+                        header: 1,
+                    });
+                    content += sheet
+                        .map((row) => (Array.isArray(row) ? row.join("\t") : ""))
+                        .join("\n");
                 });
                 return content;
             }
             else if (mimeType === "text/plain" || fileExtension === ".txt") {
-                const content = file.buffer ? file.buffer.toString('utf-8') : fs_1.default.readFileSync(file.path, 'utf-8');
+                const content = file.buffer
+                    ? file.buffer.toString("utf-8")
+                    : fs_1.default.readFileSync(file.path, "utf-8");
                 return content;
             }
             else {
@@ -402,7 +410,7 @@ Please return output in JSON format with the following structure, ensuring that 
         }
     ]
 }
-    eveything provide only in the json nothing outside the json. and please provide the written content in at least 1500 words.
+    Everything should be provided only in json nothing outside the json. and please provide the written content in at least 1500 words.
 `;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
             model: gptModel,

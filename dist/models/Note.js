@@ -35,12 +35,12 @@ const noteSchema = new mongoose_1.Schema({
     },
     type: {
         type: String,
-        default: 'Saved'
+        default: "Saved",
     },
     jsonDate: {
         type: String,
-        default: ''
-    }
+        default: "",
+    },
 }, { timestamps: true });
 const Note = mongoose_1.default.model("Note", noteSchema);
 exports.default = Note;

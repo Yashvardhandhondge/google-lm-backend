@@ -16,202 +16,214 @@ const md = new MarkdownIt();
 const gptModel = "gpt-4-turbo";
 
 interface ConversationParams {
-    context: string;
-    question: string;
-    openAIApiKey: string;
+  context: string;
+  question: string;
+  openAIApiKey: string;
 }
 
 dotenv.config();
 
 export async function getContentThroughUrl(url: string): Promise<string> {
-    try {
-        const { data: html } = await axios.get(url, { timeout: 10000 });
-        
-        if (!html) {
-            throw new Error("No HTML content returned");
-        }
+  try {
+    const { data: html } = await axios.get(url, { timeout: 10000 });
 
-        const $ = cheerio.load(html);
-        $("script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link").remove();
-
-        const bodyText = $("p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote")
-            .map((_, element) => $(element).text().trim())
-            .get()
-            .join(" ");
-
-        return bodyText.length > 5000 ? bodyText.substring(0, 5000): bodyText;
-    } catch (error: any) {
-        console.error("Error fetching content:", error.message);
-        return "Failed to fetch content.";
+    if (!html) {
+      throw new Error("No HTML content returned");
     }
+
+    const $ = cheerio.load(html);
+    $(
+      "script, style, noscript, nav, header, footer, aside, .sidebar, .advertisement, link",
+    ).remove();
+
+    const bodyText = $(
+      "p, h1, h2, h3, h4, h5, h6, span, li, article, section, blockquote",
+    )
+      .map((_, element) => $(element).text().trim())
+      .get()
+      .join(" ");
+
+    return bodyText.length > 5000 ? bodyText.substring(0, 5000) : bodyText;
+  } catch (error: any) {
+    console.error("Error fetching content:", error.message);
+    return "Failed to fetch content.";
+  }
 }
 
 export async function summarizePDFFile(
-    file: Express.Multer.File,
-    openAIApiKey: string
+  file: Express.Multer.File,
+  openAIApiKey: string,
 ): Promise<string> {
-    if (!file) {
-        throw new Error("Invalid file path provided");
-    }
-    // Step 1: Read the file as binary data
-    const base64PDF = file.buffer.toString("base64");
+  if (!file) {
+    throw new Error("Invalid file path provided");
+  }
+  // Step 1: Read the file as binary data
+  const base64PDF = file.buffer.toString("base64");
 
-    // Step 2: Send the file content to OpenAI for summarization
-    const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
+  // Step 2: Send the file content to OpenAI for summarization
+  const response = await axios.post(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      model: gptModel,
+      messages: [
         {
-            model: gptModel, 
-            messages: [
-                {
-                    role: "system",
-                    content:
-                        "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
-                },
-                {
-                    role: "user",
-                    content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
-                },
-            ],
+          role: "system",
+          content:
+            "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
         },
         {
-            headers: {
-                Authorization: `Bearer ${openAIApiKey}`,
-                "Content-Type": "application/json",
-            },
-        }
-    );
+          role: "user",
+          content: `Here is the PDF file (base64 encoded). Please summarize its content:\n\n${base64PDF}`,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
 
-    const messageContent = response.data.choices?.[0]?.message?.content;
-    if (!messageContent) {
-        throw new Error("No content received in the response");
-    }
+  const messageContent = response.data.choices?.[0]?.message?.content;
+  if (!messageContent) {
+    throw new Error("No content received in the response");
+  }
 
-    return messageContent;
+  return messageContent;
 }
 
 export async function summarizeContent(
-    content: string,
-    openAIApiKey: string
+  content: string,
+  openAIApiKey: string,
 ): Promise<string> {
-    const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
+  const response = await axios.post(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      model: gptModel,
+      messages: [
         {
-            model: gptModel,
-            messages: [
-                {
-                    role: "system",
-                    content:
-                        "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
-                },
-                {
-                    role: "user",
-                    content: `Please summarize the following content in atleast 3000 words:\n\n${content}`,
-                },
-            ],
+          role: "system",
+          content:
+            "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
         },
         {
-            headers: {
-                Authorization: `Bearer ${openAIApiKey}`,
-                "Content-Type": "application/json",
-            },
-        }
-    );
+          role: "user",
+          content: `Please summarize the following content in atleast 3000 words:\n\n${content}`,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
 
-    const messageContent = response.data.choices?.[0]?.message?.content;
-    if (!messageContent) {
-        throw new Error("No content received in the response");
-    }
+  const messageContent = response.data.choices?.[0]?.message?.content;
+  if (!messageContent) {
+    throw new Error("No content received in the response");
+  }
 
-    return messageContent;
+  return messageContent;
 }
 
 export async function suggetionChat(
-    content: string,
-    openAIApiKey: string
+  content: string,
+  openAIApiKey: string,
 ): Promise<string> {
-    const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
+  const response = await axios.post(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      model: gptModel,
+      messages: [
         {
-            model: gptModel,
-            messages: [
-                {
-                    role: "system",
-                    content:
-                        "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
-                },
-                {
-                    role: "user",
-                    content: `${content}`,
-                },
-            ],
+          role: "system",
+          content:
+            "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
         },
         {
-            headers: {
-                Authorization: `Bearer ${openAIApiKey}`,
-                "Content-Type": "application/json",
-            },
-        }
-    );
+          role: "user",
+          content: `${content}`,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
 
-    const messageContent = response.data.choices?.[0]?.message?.content;
-    if (!messageContent) {
-        throw new Error("No content received in the response");
-    }
+  const messageContent = response.data.choices?.[0]?.message?.content;
+  if (!messageContent) {
+    throw new Error("No content received in the response");
+  }
 
-    return messageContent;
+  return messageContent;
 }
 
 export const uploadFiles = async (file: Express.Multer.File) => {
-    const metadata = {
-        contentType: file.mimetype,
-    };
-    const userId = uuidv4();
-    const storageRef = ref(storage, `files/${userId}`);
-    const uploadResult = await uploadBytes(storageRef, file.buffer, metadata);
-    const fileUrl = await getDownloadURL(uploadResult.ref);
-    return fileUrl;
+  const metadata = {
+    contentType: file.mimetype,
+  };
+  const userId = uuidv4();
+  const storageRef = ref(storage, `files/${userId}`);
+  const uploadResult = await uploadBytes(storageRef, file.buffer, metadata);
+  const fileUrl = await getDownloadURL(uploadResult.ref);
+  return fileUrl;
 };
 
-export async function extractContent(file: Express.Multer.File): Promise<string> {
-    
-    const fileExtension = path.extname(file.originalname).toLowerCase();
-    const mimeType = mime.lookup(file.originalname);
+export async function extractContent(
+  file: Express.Multer.File,
+): Promise<string> {
+  const fileExtension = path.extname(file.originalname).toLowerCase();
+  const mimeType = mime.lookup(file.originalname);
 
-    try {
-        
-        if (mimeType === "application/pdf" || fileExtension === ".pdf") {
-            const data = await pdfParse(file.buffer);
-            return data.text;
-        } else if (
-            mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-            fileExtension === ".docx"
-        ) {
-            const result = await mammoth.extractRawText({ buffer: file.buffer });
-            return result.value;
-        } else if (
-            mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-            fileExtension === ".xlsx" ||
-            mimeType === "application/vnd.ms-excel" ||
-            fileExtension === ".xls"
-        ) {
-            const buffer = file.buffer ? file.buffer : fs.readFileSync(file.path);
-            const workbook = xlsx.read(buffer, { type: 'buffer' });
-            let content = "";
-            workbook.SheetNames.forEach((sheetName) => {
-                const sheet = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-                content += sheet.map((row) => (Array.isArray(row) ? row.join("\t") : "")).join("\n");
-            });
-            return content;
-        } else if (mimeType === "text/plain" || fileExtension === ".txt") {
-            const content = file.buffer ? file.buffer.toString('utf-8') : fs.readFileSync(file.path, 'utf-8');
-            return content;
-        } else {
-            throw new Error(`Unsupported file type: ${fileExtension} or ${mimeType}`);
-        }
-    } catch (error) {
-        console.error("Error extracting content:", error);
-        throw new Error("Failed to extract file content.");
+  try {
+    if (mimeType === "application/pdf" || fileExtension === ".pdf") {
+      const data = await pdfParse(file.buffer);
+      return data.text;
+    } else if (
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileExtension === ".docx"
+    ) {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      return result.value;
+    } else if (
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      fileExtension === ".xlsx" ||
+      mimeType === "application/vnd.ms-excel" ||
+      fileExtension === ".xls"
+    ) {
+      const buffer = file.buffer ? file.buffer : fs.readFileSync(file.path);
+      const workbook = xlsx.read(buffer, { type: "buffer" });
+      let content = "";
+      workbook.SheetNames.forEach((sheetName) => {
+        const sheet = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], {
+          header: 1,
+        });
+        content += sheet
+          .map((row) => (Array.isArray(row) ? row.join("\t") : ""))
+          .join("\n");
+      });
+      return content;
+    } else if (mimeType === "text/plain" || fileExtension === ".txt") {
+      const content = file.buffer
+        ? file.buffer.toString("utf-8")
+        : fs.readFileSync(file.path, "utf-8");
+      return content;
+    } else {
+      throw new Error(`Unsupported file type: ${fileExtension} or ${mimeType}`);
     }
+  } catch (error) {
+    console.error("Error extracting content:", error);
+    throw new Error("Failed to extract file content.");
+  }
 }
 
 // export async function extractTextFromFile(
@@ -228,61 +240,61 @@ export async function extractContent(file: Express.Multer.File): Promise<string>
 // }
 
 export const respondToConversation = async ({
-    context,
-    question,
-    openAIApiKey,
+  context,
+  question,
+  openAIApiKey,
 }: ConversationParams): Promise<string> => {
-    try {
-        const response = await axios.post(
-            "https://api.openai.com/v1/chat/completions",
-            {
-                model: gptModel,
-                messages: [
-                    {
-                        role: "system",
-                        content: context,
-                    },
-                    {
-                        role: "user",
-                        content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
-                    },
-                ],
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${openAIApiKey}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: gptModel,
+        messages: [
+          {
+            role: "system",
+            content: context,
+          },
+          {
+            role: "user",
+            content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-        const messageContent = response.data.choices?.[0]?.message?.content;
-        if (!messageContent) {
-            throw new Error("No content received in the response");
-        }
-
-        return messageContent;
-    } catch (error: any) {
-        console.error(error.response?.data || error.message);
-        throw new Error("Failed to retrieve the response from ChatGPT");
+    const messageContent = response.data.choices?.[0]?.message?.content;
+    if (!messageContent) {
+      throw new Error("No content received in the response");
     }
+
+    return messageContent;
+  } catch (error: any) {
+    console.error(error.response?.data || error.message);
+    throw new Error("Failed to retrieve the response from ChatGPT");
+  }
 };
 
 export const summarizeWorkspace = async ({
-    notes,
-    sources,
-    workspaceName,
-    generateReportText,
-    openAIApiKey,
+  notes,
+  sources,
+  workspaceName,
+  generateReportText,
+  openAIApiKey,
 }: {
-    notes: string[];
-    sources: string[];
-    workspaceName: string;
-    generateReportText: string;
-    openAIApiKey: string;
+  notes: string[];
+  sources: string[];
+  workspaceName: string;
+  generateReportText: string;
+  openAIApiKey: string;
 }): Promise<string> => {
-    try {
-        const prompt = `
+  try {
+    const prompt = `
 Workspace Name: ${workspaceName}
 Notes: 
 ${notes.join("\n\n")}
@@ -419,61 +431,59 @@ Please return output in JSON format with the following structure, ensuring that 
     Everything should be provided only in json nothing outside the json. and please provide the written content in at least 1500 words.
 `;
 
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: gptModel,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-
-        const response = await axios.post(
-            "https://api.openai.com/v1/chat/completions",
-            {
-                model: gptModel,
-                messages: [
-                    {
-                        role: "system",
-                        content:
-                            "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
-                    },
-                    {
-                        role: "user",
-                        content: prompt,
-                    },
-                ],
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${openAIApiKey}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-
-        const summaryContent = response.data.choices?.[0]?.message?.content;
-        if (!summaryContent) {
-            throw new Error("No summary content received in the response");
-        }
-
-        return summaryContent;
-    } catch (error: any) {
-        console.error(error.response?.data || error.message);
-        throw new Error("Failed to retrieve summary from OpenAI");
+    const summaryContent = response.data.choices?.[0]?.message?.content;
+    if (!summaryContent) {
+      throw new Error("No summary content received in the response");
     }
+
+    return summaryContent;
+  } catch (error: any) {
+    console.error(error.response?.data || error.message);
+    throw new Error("Failed to retrieve summary from OpenAI");
+  }
 };
 
 export const pullDataAnalysis = async (
-    context: any,
-    openAIApiKey: string
+  context: any,
+  openAIApiKey: string,
 ): Promise<string> => {
-    try {
-        const response = await axios.post(
-            "https://api.openai.com/v1/chat/completions",
-            {
-                model: gptModel,
-                messages: [
-                    {
-                        role: "system",
-                        content: JSON.stringify(context),
-                    },
-                    {
-                        role: "user",
-                        content: `You are a data analysis assistant. I will provide you with raw Google Analytics data, including key metrics such as page views, user counts, session durations, bounce rates, top pages, and traffic sources. Your task is to:
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: gptModel,
+        messages: [
+          {
+            role: "system",
+            content: JSON.stringify(context),
+          },
+          {
+            role: "user",
+            content: `You are a data analysis assistant. I will provide you with raw Google Analytics data, including key metrics such as page views, user counts, session durations, bounce rates, top pages, and traffic sources. Your task is to:
 Summarize the performance of the website based on this data.
 Highlight key trends, patterns, or anomalies observed.
 Suggest actionable insights or strategies to improve website performance.
@@ -481,25 +491,25 @@ Include any potential areas of concern and how they can be addressed.
 Please respond in a structured format, including the summary, observations, and recommendations clearly.
 Please give the answer in markdown format,
 `,
-                    },
-                ],
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${openAIApiKey}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-        const messageContent = response.data.choices?.[0]?.message?.content;
-        if (!messageContent) {
-            throw new Error("No content received in the response");
-        }
-
-        return messageContent;
-    } catch (error: any) {
-        console.error(error.response?.data || error.message);
-        throw new Error("Failed to retrieve the response from ChatGPT");
+    const messageContent = response.data.choices?.[0]?.message?.content;
+    if (!messageContent) {
+      throw new Error("No content received in the response");
     }
+
+    return messageContent;
+  } catch (error: any) {
+    console.error(error.response?.data || error.message);
+    throw new Error("Failed to retrieve the response from ChatGPT");
+  }
 };

@@ -216,7 +216,7 @@ const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
     var _a, _b;
     const { clerkId, workspaceId } = req.params;
     try {
-        console.log('Deleting workspace', workspaceId, 'for user', clerkId);
+        console.log("Deleting workspace", workspaceId, "for user", clerkId);
         // Start a MongoDB session for transaction
         const session = yield mongoose_1.default.startSession();
         session.startTransaction();
@@ -230,8 +230,8 @@ const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
             }
             // Find and verify workspace with all populated data
             const workspace = yield Workspace_1.default.findById(workspaceId)
-                .populate('notes')
-                .populate('sources')
+                .populate("notes")
+                .populate("sources")
                 .session(session);
             if (!workspace) {
                 yield session.abortTransaction();
@@ -244,17 +244,17 @@ const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
             // Delete all associated notes
             if (workspace.notes && workspace.notes.length > 0) {
                 // Delete each note individually to ensure proper cleanup
-                const noteIds = workspace.notes.map(note => note._id);
+                const noteIds = workspace.notes.map((note) => note._id);
                 yield Note_1.default.deleteMany({
-                    _id: { $in: noteIds }
+                    _id: { $in: noteIds },
                 }).session(session);
             }
             // Delete all associated sources
             if (workspace.sources && workspace.sources.length > 0) {
                 // Delete each source individually to ensure proper cleanup
-                const sourceIds = workspace.sources.map(source => source._id);
+                const sourceIds = workspace.sources.map((source) => source._id);
                 yield Source_2.default.deleteMany({
-                    _id: { $in: sourceIds }
+                    _id: { $in: sourceIds },
                 }).session(session);
             }
             // Delete any conversations or other related data
@@ -271,23 +271,25 @@ const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
                 deletedWorkspaceId: workspaceId,
                 deletedData: {
                     notesCount: ((_a = workspace.notes) === null || _a === void 0 ? void 0 : _a.length) || 0,
-                    sourcesCount: ((_b = workspace.sources) === null || _b === void 0 ? void 0 : _b.length) || 0
-                }
+                    sourcesCount: ((_b = workspace.sources) === null || _b === void 0 ? void 0 : _b.length) || 0,
+                },
             });
         }
         catch (error) {
             // If any error occurs during the transaction, abort it
             yield session.abortTransaction();
             session.endSession();
-            console.error('Transaction error:', error);
+            console.error("Transaction error:", error);
             throw error;
         }
     }
     catch (err) {
-        console.error('Error in deleteWorkspace:', err);
+        console.error("Error in deleteWorkspace:", err);
         res.status(500).json({
             message: "Error while deleting workspace and associated data",
-            error: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined
+            error: process.env.NODE_ENV === "development" && err instanceof Error
+                ? err.message
+                : undefined,
         });
     }
 });
@@ -402,7 +404,9 @@ const createConversation = (req, res) => __awaiter(void 0, void 0, void 0, funct
         return res.json({ message: "User not found" });
     }
     if (user.openAikey === "") {
-        return res.status(400).json({ message: "Please provide woking OpenAi key" });
+        return res
+            .status(400)
+            .json({ message: "Please provide woking OpenAi key" });
     }
     if (context === "," || question === "")
         return res.status(404).json({ message: "Please provide some context" });
@@ -428,7 +432,9 @@ const createConversationOfSuggestion = (req, res) => __awaiter(void 0, void 0, v
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(400).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         const resp = yield (0, Source_1.suggetionChat)(question, user.openAikey);
         res.status(200).json({ message: resp });
@@ -504,9 +510,7 @@ const googleAnalytics = (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error("OAuth Error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || error);
         return res.status(500).json({
             message: "OAuth process failed.",
-            details: ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) ||
-                error.message ||
-                "Unknown error occurred",
+            details: ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || "Unknown error occurred",
         });
     }
 });
@@ -579,9 +583,7 @@ const getGaProperties = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
         const properties = propertiesResponse.data.properties || [];
         if (!properties || properties.length === 0) {
-            return res
-                .status(404)
-                .json({ message: "No GA4 properties found." });
+            return res.status(404).json({ message: "No GA4 properties found." });
         }
         // Return the list of properties
         res.json({ properties });
@@ -712,7 +714,9 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
                 message: "Please select any analytics account from the home page.",
             });
         if (user.openAikey === "") {
-            return res.status(400).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -733,7 +737,7 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
         const newNote = new Note_1.default({
             heading: `Analytics for ${startDate} to ${endDate}`,
             content: analysis,
-            type: 'Analytics'
+            type: "Analytics",
         });
         const workspace = yield Workspace_1.default.findById(workspaceId);
         yield newNote.save();
@@ -798,7 +802,9 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(400).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         const filteredNotes = workspace.notes.filter((note) => {
             const noteDate = new Date(note.createdAt);
@@ -820,7 +826,7 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
         const newNote = new Note_1.default({
             heading: `Report for ${startDate} to ${endDate}`,
             content: summary,
-            type: 'Report'
+            type: "Report",
         });
         yield newNote.save();
         workspace.notes.push(newNote._id);
@@ -845,16 +851,12 @@ const deleteNote = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     try {
         const result = yield Note_1.default.deleteMany({ _id: { $in: noteIds } });
         if (result.deletedCount === 0) {
-            return res
-                .status(404)
-                .json({ message: "No notes found to delete." });
+            return res.status(404).json({ message: "No notes found to delete." });
         }
         if (workspaceId) {
             const workspaceUpdate = yield Workspace_1.default.findByIdAndUpdate(workspaceId, { $pull: { notes: { $in: noteIds } } }, { new: true });
             if (!workspaceUpdate) {
-                return res
-                    .status(404)
-                    .json({ message: "Workspace not found." });
+                return res.status(404).json({ message: "Workspace not found." });
             }
         }
         res.status(200).json({
@@ -877,8 +879,7 @@ const renameSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
     try {
         // Find the source by _id and update its name
-        const updatedSource = yield Source_2.default.findByIdAndUpdate(_id, { name }, { new: true } // Return the updated document
-        );
+        const updatedSource = yield Source_2.default.findByIdAndUpdate(_id, { name }, { new: true });
         if (!updatedSource) {
             return res.status(404).json({
                 message: "Source not found.",
@@ -914,8 +915,7 @@ const removeSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         // If workspaceId is provided, remove the source reference from the workspace
         if (workspaceId) {
             const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(workspaceId, { $pull: { sources: _id } }, // Remove the source reference
-            { new: true } // Return the updated document
-            );
+            { new: true });
             if (!updatedWorkspace) {
                 return res.status(404).json({
                     message: "Workspace not found.",
@@ -924,8 +924,7 @@ const removeSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         else {
             // If no specific workspaceId is provided, remove the source reference from all workspaces
-            yield Workspace_1.default.updateMany({ sources: _id }, { $pull: { sources: _id } } // Remove the source reference
-            );
+            yield Workspace_1.default.updateMany({ sources: _id }, { $pull: { sources: _id } });
         }
         res.status(200).json({
             message: "Source removed successfully.",
@@ -948,8 +947,7 @@ const renameWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
     }
     try {
-        const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(_id, { name }, { new: true } // Return the updated document
-        );
+        const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(_id, { name }, { new: true });
         if (!updatedWorkspace) {
             return res.status(404).json({
                 message: "Workspace not found.",
