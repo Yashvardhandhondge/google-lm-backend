@@ -92,7 +92,7 @@ function summarizePDFFile(file, openAIApiKey) {
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.  Please give the answer in markdown format",
+                    content: "You are an AI assistant that summarizes PDF documents. The user will provide a base64-encoded PDF, and you should extract key points and summarize them in an informative manner.Please give the answer in markdown format",
                 },
                 {
                     role: "user",
@@ -120,11 +120,11 @@ function summarizeContent(content, openAIApiKey) {
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.Please give the answer in markdown format",
                 },
                 {
                     role: "user",
-                    content: `Please summarize the following content in atleast 3000 words:\n\n${content}`,
+                    content: `Please summarize the following content in around 3000 words:\n\n${content}`,
                 },
             ],
         }, {
@@ -148,7 +148,7 @@ function suggetionChat(content, openAIApiKey) {
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI trained to summarize text content in a concise and informative manner.  Please give the answer in markdown format",
+                    content: "You are an AI trained to summarize text content in a concise and informative manner.Please give the answer in markdown format",
                 },
                 {
                     role: "user",
@@ -252,7 +252,7 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
                 },
                 {
                     role: "user",
-                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.  Please give the answer in markdown format`,
+                    content: `Please provide an answer to this question: "${question}" from the given content. If the context is not there then please provide answer from your side.Please give the answer in markdown format`,
                 },
             ],
         }, {
@@ -417,7 +417,7 @@ Please return output in JSON format with the following structure, ensuring that 
             messages: [
                 {
                     role: "system",
-                    content: "You are an AI assistant. Summarize and provide insights based on the provided data. Please give the answer in markdown format",
+                    content: "You are an AI assistant.Summarize and provide insights based on the provided data.Please give the answer in markdown format",
                 },
                 {
                     role: "user",
