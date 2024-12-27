@@ -1,5 +1,5 @@
 #mongo
-MONGODB_URI = 
+MONGODB_URI =
 
 #application
 PORT = 5000
@@ -24,7 +24,6 @@ FIREBASE_APP_ID=
 #Analytics
 CLIENT_ID=
 CLIENT_SECRET=
-
 
 1. .env file should look something like this
 2. npm i for installation of all the packages

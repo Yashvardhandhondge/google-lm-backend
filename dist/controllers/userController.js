@@ -12,10 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
+exports.renameWorkspace = exports.removeSource = exports.renameSource = exports.deleteNote = exports.generateReport = exports.getGaReportForWorkspace = exports.getGaReport = exports.getGaProperties = exports.getAllAccounts = exports.googleAnalytics = exports.updateNote = exports.createConversationOfSuggestion = exports.createConversation = exports.getAllSources = exports.createSource = exports.deleteWorkspace = exports.getAllNotes = exports.createNewNote = exports.getWorkspace = exports.getAllWorkspaces = exports.createNewWorkspace = exports.getOpenAikey = exports.saveOpenAikey = exports.getUser = exports.createUser = void 0;
 const User_1 = __importDefault(require("../models/User"));
 const Workspace_1 = __importDefault(require("../models/Workspace"));
 const Note_1 = __importDefault(require("../models/Note"));
+const mongoose_1 = __importDefault(require("mongoose"));
 const Source_1 = require("../services/Source");
 const Source_2 = __importDefault(require("../models/Source"));
 const axios_1 = __importDefault(require("axios"));
@@ -23,6 +24,19 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const googleapis_1 = require("googleapis");
 dotenv_1.default.config();
 const oauth2Client = new googleapis_1.google.auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_SECRET, process.env.REDIRECT_URI);
+// const matricsArray = [
+//     { name: "activeUsers" },
+//     { name: "screenPageViews" },
+//     { name: "eventCount" },
+//     { name: "userEngagementDuration" },
+//     { name: "sessions" },
+//     { name: "newUsers" },
+//     { name: "totalUsers" },
+//     { name: "bounceRate" },
+//     { name: "transactions" },
+//     // { name: "totalRevenue" },
+//     { name: "itemListClickThroughRate" },
+// ]
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, clerkId } = req.body;
     try {
@@ -66,7 +80,7 @@ const saveOpenAikey = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             message: "API saved successfully",
             api: user.openAikey === "" ? false : true,
             googleAnalytics: user.googleAnalytics === "" ? false : true,
-            propertyId: user.propertyId === '' ? false : true
+            propertyId: user.propertyId === "" ? false : true,
         });
     }
     catch (error) {
@@ -132,6 +146,7 @@ const getAllWorkspaces = (req, res) => __awaiter(void 0, void 0, void 0, functio
         res.status(200).json({
             workspaces: user.workspaces,
             message: "Workspace Fetched",
+            propertyNames: user.propertyName,
         });
     }
     catch (err) {
@@ -197,6 +212,106 @@ const getAllNotes = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getAllNotes = getAllNotes;
+const deleteWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { clerkId, workspaceId } = req.params;
+    try {
+        console.log("Deleting workspace", workspaceId, "for user", clerkId);
+        // Start a MongoDB session for transaction
+        const session = yield mongoose_1.default.startSession();
+        session.startTransaction();
+        try {
+            // Find and verify user
+            const user = yield User_1.default.findOne({ clerkId }).session(session);
+            if (!user) {
+                yield session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "User not found" });
+            }
+            // Find and verify workspace with all populated data
+            const workspace = yield Workspace_1.default.findById(workspaceId)
+                .populate("notes")
+                .populate("sources")
+                .session(session);
+            if (!workspace) {
+                yield session.abortTransaction();
+                session.endSession();
+                return res.status(404).json({ message: "Workspace not found" });
+            }
+            // Remove workspace reference from user
+            user.workspaces = user.workspaces.filter((id) => id.toString() !== workspaceId);
+            yield user.save({ session });
+            // Delete all associated notes
+            if (workspace.notes && workspace.notes.length > 0) {
+                // Delete each note individually to ensure proper cleanup
+                const noteIds = workspace.notes.map((note) => note._id);
+                yield Note_1.default.deleteMany({
+                    _id: { $in: noteIds },
+                }).session(session);
+            }
+            // Delete all associated sources
+            if (workspace.sources && workspace.sources.length > 0) {
+                // Delete each source individually to ensure proper cleanup
+                const sourceIds = workspace.sources.map((source) => source._id);
+                yield Source_2.default.deleteMany({
+                    _id: { $in: sourceIds },
+                }).session(session);
+            }
+            // Delete any conversations or other related data
+            // Add more cleanup here if you have other related collections
+            // Finally delete the workspace itself
+            yield Workspace_1.default.findByIdAndDelete(workspaceId).session(session);
+            // Commit the transaction
+            yield session.commitTransaction();
+            session.endSession();
+            // Log successful deletion
+            console.log(`Successfully deleted workspace ${workspaceId} and all associated data`);
+            res.status(200).json({
+                message: "Workspace and all associated data deleted successfully",
+                deletedWorkspaceId: workspaceId,
+                deletedData: {
+                    notesCount: ((_a = workspace.notes) === null || _a === void 0 ? void 0 : _a.length) || 0,
+                    sourcesCount: ((_b = workspace.sources) === null || _b === void 0 ? void 0 : _b.length) || 0,
+                },
+            });
+        }
+        catch (error) {
+            // If any error occurs during the transaction, abort it
+            yield session.abortTransaction();
+            session.endSession();
+            console.error("Transaction error:", error);
+            throw error;
+        }
+    }
+    catch (err) {
+        console.error("Error in deleteWorkspace:", err);
+        res.status(500).json({
+            message: "Error while deleting workspace and associated data",
+            error: process.env.NODE_ENV === "development" && err instanceof Error
+                ? err.message
+                : undefined,
+        });
+    }
+});
+exports.deleteWorkspace = deleteWorkspace;
+function splitContent(content, chunkSize = 10000) {
+    const chunks = [];
+    for (let i = 0; i < content.length; i += chunkSize) {
+        chunks.push(content.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+function summarizeLargeContent(content, apiKey) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const chunks = splitContent(content);
+        let finalSummary = "";
+        for (const chunk of chunks) {
+            const summary = yield (0, Source_1.summarizeContent)(chunk, apiKey);
+            finalSummary += summary + "\n\n";
+        }
+        return finalSummary.trim();
+    });
+}
 const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { workspaceId } = req.params;
@@ -212,16 +327,26 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.status(410).json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         if (uploadType === "file" && req.file) {
-            const fileUrl = yield (0, Source_1.uploadFiles)(file);
-            const content = yield (0, Source_1.extractTextFromFile)(file, user.openAikey);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            let fileUrl;
+            try {
+                fileUrl = yield (0, Source_1.uploadFiles)(file);
+            }
+            catch (error) {
+                return res.status(400).json({
+                    message: "File upload failed. Please upload a smaller file or try again.",
+                });
+            }
+            const content = yield (0, Source_1.extractContent)(file);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url: fileUrl,
                 summary,
-                name: req.file.originalname,
+                name: req.file.originalname.split(".").slice(0, -1).join("."),
                 uploadType,
             });
             yield newSource.save();
@@ -230,9 +355,8 @@ const createSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return res.status(200).json({ newSource, message: "Source Added" });
         }
         else if (uploadType === "url" && url) {
-            // If URL is provided, process it as usual
             const content = yield (0, Source_1.getContentThroughUrl)(url);
-            const summary = yield (0, Source_1.summarizeContent)(content, user.openAikey);
+            const summary = yield summarizeLargeContent(content, user.openAikey);
             const newSource = new Source_2.default({
                 url,
                 summary,
@@ -280,7 +404,9 @@ const createConversation = (req, res) => __awaiter(void 0, void 0, void 0, funct
         return res.json({ message: "User not found" });
     }
     if (user.openAikey === "") {
-        return res.json({ message: "Please provide woking OpenAi key" });
+        return res
+            .status(400)
+            .json({ message: "Please provide woking OpenAi key" });
     }
     if (context === "," || question === "")
         return res.status(404).json({ message: "Please provide some context" });
@@ -306,7 +432,9 @@ const createConversationOfSuggestion = (req, res) => __awaiter(void 0, void 0, v
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         const resp = yield (0, Source_1.suggetionChat)(question, user.openAikey);
         res.status(200).json({ message: resp });
@@ -382,9 +510,7 @@ const googleAnalytics = (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error("OAuth Error:", ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || error);
         return res.status(500).json({
             message: "OAuth process failed.",
-            details: ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) ||
-                error.message ||
-                "Unknown error occurred",
+            details: ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || "Unknown error occurred",
         });
     }
 });
@@ -417,13 +543,13 @@ const getAllAccounts = (req, res) => __awaiter(void 0, void 0, void 0, function*
             try {
                 const user = yield User_1.default.findOne({ clerkId });
                 if (!user) {
-                    return res.json({ message: "User not found" });
+                    return res.status(400).json({ message: "User not found" });
                 }
                 user.googleAnalytics = "";
                 user.propertyId = "";
                 user.googleRefreshToken = "";
                 yield user.save();
-                res.status(410).json({
+                res.status(400).json({
                     message: "Token expired, Link again Google Analytics..",
                 });
             }
@@ -457,9 +583,7 @@ const getGaProperties = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
         const properties = propertiesResponse.data.properties || [];
         if (!properties || properties.length === 0) {
-            return res
-                .status(404)
-                .json({ message: "No GA4 properties found." });
+            return res.status(404).json({ message: "No GA4 properties found." });
         }
         // Return the list of properties
         res.json({ properties });
@@ -478,8 +602,7 @@ const getGaProperties = (req, res) => __awaiter(void 0, void 0, void 0, function
 exports.getGaProperties = getGaProperties;
 const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
-    const { clerkId, propertyId } = req.query;
-    // Validate required parameters
+    const { clerkId, propertyId, displayName } = req.query;
     if (!clerkId || !propertyId) {
         return res
             .status(400)
@@ -490,63 +613,58 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res.status(404).json({ message: "User not found." });
         }
-        if (user.openAikey === '') {
-            return res.json({ message: 'Please provide OpenAI key' });
-        }
-        oauth2Client.setCredentials({
-            access_token: user.googleAnalytics,
-            refresh_token: user.googleRefreshToken,
-        });
-        const analyticsData = googleapis_1.google.analyticsdata("v1beta");
-        const reportResponse = yield analyticsData.properties.runReport({
-            auth: oauth2Client,
-            property: propertyId,
-            requestBody: {
-                dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
-                metrics: [
-                    { name: "activeUsers" },
-                    { name: "screenPageViews" },
-                    { name: "eventCount" },
-                    { name: "userEngagementDuration" },
-                    { name: "sessions" },
-                    { name: "newUsers" },
-                    { name: "totalUsers" },
-                ],
-                dimensions: [{ name: "date" }],
-                returnPropertyQuota: true,
-            },
-        });
-        const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey);
-        const newNote = new Note_1.default({
-            heading: "Google Analytics",
-            content: analysis,
-            type: "Analytics",
-        });
-        yield newNote.save();
-        let workspaceId;
-        if (user.workspaces.length > 0) {
-            workspaceId = user.workspaces[0];
-            const workspace = yield Workspace_1.default.findOne({ _id: workspaceId });
-            workspace === null || workspace === void 0 ? void 0 : workspace.notes.push(newNote._id);
-            yield (workspace === null || workspace === void 0 ? void 0 : workspace.save());
-        }
-        else {
-            const newWorkspace = new Workspace_1.default({
-                name: "New Workspace",
-                notes: [newNote._id],
-            });
-            yield newWorkspace.save();
-            user.workspaces.push(newWorkspace._id);
-        }
+        // if (user.openAikey === "") {
+        //     return res.status(400).json({ message: "Please provide OpenAI key" });
+        // }
+        // oauth2Client.setCredentials({
+        //     access_token: user.googleAnalytics,
+        //     refresh_token: user.googleRefreshToken,
+        // });
+        // const analyticsData = google.analyticsdata("v1beta");
+        // const reportResponse = await analyticsData.properties.runReport({
+        //     auth: oauth2Client,
+        //     property: propertyId as string,
+        //     requestBody: {
+        //         dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+        //         metrics: matricsArray,
+        //         dimensions: [{ name: "date" }],
+        //         returnPropertyQuota: true,
+        //     },
+        // });
+        // const analysis = await pullDataAnalysis(
+        //     reportResponse.data,
+        //     user.openAikey
+        // );
+        // const newNote = new Note({
+        //     heading: "Google Analytics",
+        //     content: analysis,
+        //     type: "Analytics",
+        // });
+        // await newNote.save();
+        // let workspaceId: mongoose.Types.ObjectId;
+        // if (user.workspaces.length > 0) {
+        //     workspaceId = user.workspaces[0];
+        //     const workspace = await Workspace.findOne({ _id: workspaceId });
+        //     workspace?.notes.push(newNote._id as mongoose.Types.ObjectId);
+        //     await workspace?.save();
+        // } else {
+        //     const newWorkspace = new Workspace({
+        //         name: "New Workspace",
+        //         notes: [newNote._id],
+        //     });
+        //     await newWorkspace.save();
+        //     user.workspaces.push(newWorkspace._id as mongoose.Types.ObjectId);
+        // }
         user.propertyId = propertyId;
+        user.propertyName = displayName;
         yield user.save();
-        const userWorkspaces = yield User_1.default.findOne({ clerkId })
-            .populate({
-            path: "workspaces",
-            select: "-notes -source",
-        })
-            .lean();
-        res.json({ workspace: userWorkspaces === null || userWorkspaces === void 0 ? void 0 : userWorkspaces.workspaces, propertyId: true });
+        // const userWorkspaces = await User.findOne({ clerkId })
+        //     .populate({
+        //         path: "workspaces",
+        //         select: "-notes -source",
+        //     })
+        //     .lean();
+        res.json({ propertyId: true, propertyName: displayName });
     }
     catch (error) {
         console.error("Error fetching GA4 analytics report:", error);
@@ -577,7 +695,7 @@ const getGaReport = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getGaReport = getGaReport;
 const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e;
-    const { clerkId, startDate, endDate, metrics } = req.body;
+    const { clerkId, startDate, endDate, metrics, workspaceId } = req.body;
     if (!clerkId ||
         !startDate ||
         !endDate ||
@@ -596,7 +714,9 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
                 message: "Please select any analytics account from the home page.",
             });
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         oauth2Client.setCredentials({
             access_token: user.googleAnalytics,
@@ -614,7 +734,16 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
             },
         });
         const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey);
-        res.json(analysis);
+        const newNote = new Note_1.default({
+            heading: `Analytics for ${startDate} to ${endDate}`,
+            content: analysis,
+            type: "Analytics",
+        });
+        const workspace = yield Workspace_1.default.findById(workspaceId);
+        yield newNote.save();
+        workspace === null || workspace === void 0 ? void 0 : workspace.notes.push(newNote._id);
+        yield (workspace === null || workspace === void 0 ? void 0 : workspace.save());
+        res.json({ analysis, newNote });
     }
     catch (error) {
         console.error("Error fetching GA4 analytics report:", error);
@@ -646,7 +775,6 @@ exports.getGaReportForWorkspace = getGaReportForWorkspace;
 const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { workspaceId } = req.params;
     const { startDate, endDate, generateReportText, clerkId } = req.body;
-    // Validate date inputs
     if (!startDate || !endDate) {
         return res
             .status(400)
@@ -674,7 +802,9 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             return res.json({ message: "User not found" });
         }
         if (user.openAikey === "") {
-            return res.json({ message: "Please provide woking OpenAi key" });
+            return res
+                .status(400)
+                .json({ message: "Please provide woking OpenAi key" });
         }
         const filteredNotes = workspace.notes.filter((note) => {
             const noteDate = new Date(note.createdAt);
@@ -691,9 +821,17 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             sources: sourcesContent,
             workspaceName: workspace.name,
             generateReportText,
-            openAIApiKey: user.openAikey
+            openAIApiKey: user.openAikey,
         });
-        res.json({ summary });
+        const newNote = new Note_1.default({
+            heading: `Report for ${startDate} to ${endDate}`,
+            content: summary,
+            type: "Report",
+        });
+        yield newNote.save();
+        workspace.notes.push(newNote._id);
+        yield workspace.save();
+        res.json({ summary, newNote });
     }
     catch (error) {
         console.error("Error generating report:", error);
@@ -713,16 +851,12 @@ const deleteNote = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     try {
         const result = yield Note_1.default.deleteMany({ _id: { $in: noteIds } });
         if (result.deletedCount === 0) {
-            return res
-                .status(404)
-                .json({ message: "No notes found to delete." });
+            return res.status(404).json({ message: "No notes found to delete." });
         }
         if (workspaceId) {
             const workspaceUpdate = yield Workspace_1.default.findByIdAndUpdate(workspaceId, { $pull: { notes: { $in: noteIds } } }, { new: true });
             if (!workspaceUpdate) {
-                return res
-                    .status(404)
-                    .json({ message: "Workspace not found." });
+                return res.status(404).json({ message: "Workspace not found." });
             }
         }
         res.status(200).json({
@@ -745,8 +879,7 @@ const renameSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
     try {
         // Find the source by _id and update its name
-        const updatedSource = yield Source_2.default.findByIdAndUpdate(_id, { name }, { new: true } // Return the updated document
-        );
+        const updatedSource = yield Source_2.default.findByIdAndUpdate(_id, { name }, { new: true });
         if (!updatedSource) {
             return res.status(404).json({
                 message: "Source not found.",
@@ -782,8 +915,7 @@ const removeSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         // If workspaceId is provided, remove the source reference from the workspace
         if (workspaceId) {
             const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(workspaceId, { $pull: { sources: _id } }, // Remove the source reference
-            { new: true } // Return the updated document
-            );
+            { new: true });
             if (!updatedWorkspace) {
                 return res.status(404).json({
                     message: "Workspace not found.",
@@ -792,8 +924,7 @@ const removeSource = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         else {
             // If no specific workspaceId is provided, remove the source reference from all workspaces
-            yield Workspace_1.default.updateMany({ sources: _id }, { $pull: { sources: _id } } // Remove the source reference
-            );
+            yield Workspace_1.default.updateMany({ sources: _id }, { $pull: { sources: _id } });
         }
         res.status(200).json({
             message: "Source removed successfully.",
@@ -816,8 +947,7 @@ const renameWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
     }
     try {
-        const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(_id, { name }, { new: true } // Return the updated document
-        );
+        const updatedWorkspace = yield Workspace_1.default.findByIdAndUpdate(_id, { name }, { new: true });
         if (!updatedWorkspace) {
             return res.status(404).json({
                 message: "Workspace not found.",
