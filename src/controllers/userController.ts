@@ -825,13 +825,17 @@ export const getGaReportForWorkspace = async (req: Request, res: Response) => {
       },
     });
 
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
     const analysis = await pullDataAnalysis(
       reportResponse.data,
       user.openAikey,
+      start,
+      end,
     );
-
     const newNote = new Note({
-      heading: `Analytics for ${startDate} to ${endDate}`,
+      heading: `Analytics for ${start.toDateString()} to ${end.toDateString()}`,
       content: analysis,
       type: "Analytics",
     });
@@ -934,10 +938,12 @@ export const generateReport = async (req: Request, res: Response) => {
       workspaceName: workspace.name,
       generateReportText,
       openAIApiKey: user.openAikey,
+      start,
+      end,
     });
 
     const newNote = new Note({
-      heading: `Report for ${startDate} to ${endDate}`,
+      heading: `Report for ${start.toDateString()} to ${end.toDateString()}`,
       content: summary,
       type: "Report",
     });
