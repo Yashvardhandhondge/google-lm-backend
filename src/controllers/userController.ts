@@ -154,7 +154,7 @@ export const getAllWorkspaces = async (req: Request, res: Response) => {
     res.status(200).json({
       workspaces: user.workspaces,
       message: "Workspace Fetched",
-      propertyNames: user.propertyName,
+      propertyName: user.propertyName,
     });
   } catch (err) {
     res.status(500).json({ message: "Error while fetching workspaces" });
