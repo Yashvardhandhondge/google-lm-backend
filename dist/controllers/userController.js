@@ -146,7 +146,7 @@ const getAllWorkspaces = (req, res) => __awaiter(void 0, void 0, void 0, functio
         res.status(200).json({
             workspaces: user.workspaces,
             message: "Workspace Fetched",
-            propertyNames: user.propertyName,
+            propertyName: user.propertyName,
         });
     }
     catch (err) {
