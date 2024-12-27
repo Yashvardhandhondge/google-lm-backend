@@ -286,12 +286,16 @@ export const summarizeWorkspace = async ({
   workspaceName,
   generateReportText,
   openAIApiKey,
+  start,
+  end,
 }: {
   notes: string[];
   sources: string[];
   workspaceName: string;
   generateReportText: string;
   openAIApiKey: string;
+  start: Date;
+  end: Date;
 }): Promise<string> => {
   try {
     const prompt = `
@@ -303,6 +307,8 @@ Sources:
 ${sources.join("\n\n")}
 
 Context: ${generateReportText}
+
+The data is between date ${start} and ${end}.
 
 Generate a detailed website performance report including all the below-listed points using the data and context provided above:
 
@@ -428,7 +434,7 @@ Please return output in JSON format with the following structure, ensuring that 
         }
     ]
 }
-    Everything should be provided only in json nothing outside the json. and please provide the written content in at least 1500 words.
+    Everything should be provided only in json nothing outside the json and please provide the written content in at least 1500 words.
 `;
 
     const response = await axios.post(
@@ -470,6 +476,8 @@ Please return output in JSON format with the following structure, ensuring that 
 export const pullDataAnalysis = async (
   context: any,
   openAIApiKey: string,
+  start: Date,
+  end: Date,
 ): Promise<string> => {
   try {
     const response = await axios.post(
@@ -489,7 +497,8 @@ Highlight key trends, patterns, or anomalies observed.
 Suggest actionable insights or strategies to improve website performance.
 Include any potential areas of concern and how they can be addressed.
 Please respond in a structured format, including the summary, observations, and recommendations clearly.
-Please give the answer in markdown format,
+The data is between date ${start} and ${end}.
+Please give the answer in markdown format.
 `,
           },
         ],

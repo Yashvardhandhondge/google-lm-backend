@@ -273,7 +273,7 @@ const respondToConversation = (_a) => __awaiter(void 0, [_a], void 0, function* 
     }
 });
 exports.respondToConversation = respondToConversation;
-const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey, }) {
+const summarizeWorkspace = (_a) => __awaiter(void 0, [_a], void 0, function* ({ notes, sources, workspaceName, generateReportText, openAIApiKey, start, end, }) {
     var _b, _c, _d, _e;
     try {
         const prompt = `
@@ -285,6 +285,8 @@ Sources:
 ${sources.join("\n\n")}
 
 Context: ${generateReportText}
+
+The data is between date ${start} and ${end}.
 
 Generate a detailed website performance report including all the below-listed points using the data and context provided above:
 
@@ -410,7 +412,7 @@ Please return output in JSON format with the following structure, ensuring that 
         }
     ]
 }
-    Everything should be provided only in json nothing outside the json. and please provide the written content in at least 1500 words.
+    Everything should be provided only in json nothing outside the json and please provide the written content in at least 1500 words.
 `;
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
             model: gptModel,
@@ -442,7 +444,7 @@ Please return output in JSON format with the following structure, ensuring that 
     }
 });
 exports.summarizeWorkspace = summarizeWorkspace;
-const pullDataAnalysis = (context, openAIApiKey) => __awaiter(void 0, void 0, void 0, function* () {
+const pullDataAnalysis = (context, openAIApiKey, start, end) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d;
     try {
         const response = yield axios_1.default.post("https://api.openai.com/v1/chat/completions", {
@@ -460,7 +462,8 @@ Highlight key trends, patterns, or anomalies observed.
 Suggest actionable insights or strategies to improve website performance.
 Include any potential areas of concern and how they can be addressed.
 Please respond in a structured format, including the summary, observations, and recommendations clearly.
-Please give the answer in markdown format,
+The data is between date ${start} and ${end}.
+Please give the answer in markdown format.
 `,
                 },
             ],

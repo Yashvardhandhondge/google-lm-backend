@@ -733,9 +733,11 @@ const getGaReportForWorkspace = (req, res) => __awaiter(void 0, void 0, void 0, 
                 returnPropertyQuota: true,
             },
         });
-        const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const analysis = yield (0, Source_1.pullDataAnalysis)(reportResponse.data, user.openAikey, start, end);
         const newNote = new Note_1.default({
-            heading: `Analytics for ${startDate} to ${endDate}`,
+            heading: `Analytics for ${start.toDateString()} to ${end.toDateString()}`,
             content: analysis,
             type: "Analytics",
         });
@@ -822,9 +824,11 @@ const generateReport = (req, res) => __awaiter(void 0, void 0, void 0, function*
             workspaceName: workspace.name,
             generateReportText,
             openAIApiKey: user.openAikey,
+            start,
+            end,
         });
         const newNote = new Note_1.default({
-            heading: `Report for ${startDate} to ${endDate}`,
+            heading: `Report for ${start.toDateString()} to ${end.toDateString()}`,
             content: summary,
             type: "Report",
         });
